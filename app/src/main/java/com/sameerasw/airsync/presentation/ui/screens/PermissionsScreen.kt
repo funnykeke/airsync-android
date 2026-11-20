@@ -42,12 +42,7 @@ import com.sameerasw.airsync.utils.PermissionUtil
 fun PermissionsScreen(
     modifier: Modifier = Modifier,
     onRequestNotificationPermission: (() -> Unit)? = null,
-    onRequestCallLogPermission: (() -> Unit)? = null,
-    onRequestContactsPermission: (() -> Unit)? = null,
-    onRequestPhonePermission: (() -> Unit)? = null,
-    onRequestBluetoothPermission: (() -> Unit)? = null,
     onRequestLocalNetworkPermission: (() -> Unit)? = null,
-    onRequestAnswerCallsPermission: (() -> Unit)? = null,
     refreshTrigger: Int = 0
 ) {
     val context = LocalContext.current
@@ -111,7 +106,7 @@ fun PermissionsScreen(
                         Row(modifier = Modifier.padding(16.dp)) {
                             Column {
                                 Text(
-                                    text = "Missing permissions",
+                                    text = stringResource(R.string.ui_missing_permissions),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = if (criticalPermissions.isNotEmpty())
                                         MaterialTheme.colorScheme.onErrorContainer
@@ -119,7 +114,7 @@ fun PermissionsScreen(
                                 )
 
                                 Text(
-                                    text = "Open to read more and grant",
+                                    text = stringResource(R.string.ui_open_to_read_more_and_grant),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -132,7 +127,7 @@ fun PermissionsScreen(
                             }) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh"
+                                    contentDescription = stringResource(R.string.ui_refresh)
                                 )
                             }
                         }
@@ -145,8 +140,8 @@ fun PermissionsScreen(
                             when (permission) {
                                 "Notification Access" -> {
                                     PermissionButton(
-                                        permissionName = permission,
-                                        description = "Required for syncing notifications",
+                                        permissionName = stringResource(R.string.ui_notification_access),
+                                        description = stringResource(R.string.ui_required_for_syncing_notifications),
                                         onExplainClick = {
                                             showDialog = PermissionType.NOTIFICATION_ACCESS
                                         },
@@ -163,8 +158,8 @@ fun PermissionsScreen(
                             when (permission) {
                                 "Post Notifications" -> {
                                     PermissionButton(
-                                        permissionName = permission,
-                                        description = "Show connection status and alerts",
+                                        permissionName = stringResource(R.string.ui_post_notifications),
+                                        description = stringResource(R.string.ui_show_connection_status_and_alerts),
                                         onExplainClick = {
                                             showDialog = PermissionType.POST_NOTIFICATIONS
                                         },
@@ -174,8 +169,8 @@ fun PermissionsScreen(
 
                                 "Background App Usage" -> {
                                     PermissionButton(
-                                        permissionName = permission,
-                                        description = "Keep the app alive when inactive",
+                                        permissionName = stringResource(R.string.ui_background_app_usage),
+                                        description = stringResource(R.string.ui_keep_the_app_alive_when_inactive),
                                         onExplainClick = {
                                             showDialog = PermissionType.BACKGROUND_USAGE
                                         },
@@ -185,8 +180,8 @@ fun PermissionsScreen(
 
                                 "Wallpaper & File Access" -> {
                                     PermissionButton(
-                                        permissionName = permission,
-                                        description = "Enables wallpaper sync and Mac File Access",
+                                        permissionName = stringResource(R.string.ui_wallpaper_file_access),
+                                        description = stringResource(R.string.ui_enables_wallpaper_sync_and_mac_file_access),
                                         onExplainClick = {
                                             showDialog = PermissionType.WALLPAPER_ACCESS
                                         },
@@ -194,63 +189,12 @@ fun PermissionsScreen(
                                     )
                                 }
 
-                                "Call Log Access" -> {
-                                    PermissionButton(
-                                        permissionName = permission,
-                                        description = "Necessary for mapping the caller info",
-                                        onExplainClick = {
-                                            showDialog = PermissionType.CALL_LOG
-                                        },
-                                        isCritical = false
-                                    )
-                                }
-
-                                "Contacts Access" -> {
-                                    PermissionButton(
-                                        permissionName = permission,
-                                        description = "Necessary for displaying known contacts in calls",
-                                        onExplainClick = {
-                                            showDialog = PermissionType.CONTACTS
-                                        },
-                                        isCritical = false
-                                    )
-                                }
-
-                                "Phone Access" -> {
-                                    PermissionButton(
-                                        permissionName = permission,
-                                        description = "Detects call state changes",
-                                        onExplainClick = { showDialog = PermissionType.PHONE },
-                                        isCritical = false
-                                    )
-                                }
-
-                                "Bluetooth Access" -> {
-                                    PermissionButton(
-                                        permissionName = permission,
-                                        description = "Enables background BLE sync",
-                                        onExplainClick = { showDialog = PermissionType.BLUETOOTH },
-                                        isCritical = false
-                                    )
-                                }
-
                                 "Local Network Access" -> {
                                     PermissionButton(
-                                        permissionName = permission,
-                                        description = "Discover nearby Mac devices on Wi-Fi",
+                                        permissionName = stringResource(R.string.ui_local_network_access),
+                                        description = stringResource(R.string.ui_discover_nearby_mac_devices_on_wi_fi),
                                         onExplainClick = {
                                             showDialog = PermissionType.LOCAL_NETWORK
-                                        },
-                                        isCritical = false
-                                    )
-                                }
-
-                                "Answer Calls" -> {
-                                    PermissionButton(
-                                        permissionName = permission,
-                                        description = "Accept and end calls from Mac",
-                                        onExplainClick = {
-                                            showDialog = PermissionType.ANSWER_CALLS
                                         },
                                         isCritical = false
                                     )
@@ -299,28 +243,8 @@ fun PermissionsScreen(
                         PermissionUtil.openManageExternalStorageSettings(context)
                     }
 
-                    PermissionType.CALL_LOG -> {
-                        onRequestCallLogPermission?.invoke()
-                    }
-
-                    PermissionType.CONTACTS -> {
-                        onRequestContactsPermission?.invoke()
-                    }
-
-                    PermissionType.PHONE -> {
-                        onRequestPhonePermission?.invoke()
-                    }
-
-                    PermissionType.BLUETOOTH -> {
-                        onRequestBluetoothPermission?.invoke()
-                    }
-
                     PermissionType.LOCAL_NETWORK -> {
                         onRequestLocalNetworkPermission?.invoke()
-                    }
-
-                    PermissionType.ANSWER_CALLS -> {
-                        onRequestAnswerCallsPermission?.invoke()
                     }
 
                     PermissionType.CLIPBOARD_ACCESSIBILITY -> {
@@ -372,7 +296,7 @@ private fun PermissionButton(
                     },
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
-                    Text("Open")
+                    Text(stringResource(R.string.action_open))
                 }
             } else {
                 OutlinedButton(
@@ -382,7 +306,7 @@ private fun PermissionButton(
                     },
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
-                    Text("Open")
+                    Text(stringResource(R.string.action_open))
                 }
             }
         }

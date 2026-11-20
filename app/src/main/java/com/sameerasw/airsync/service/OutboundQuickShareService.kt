@@ -83,6 +83,11 @@ class OutboundQuickShareService : Service() {
         }
 
         serviceScope.launch {
+            if (dataStoreManager.getTransportMode().first() != "local") {
+                updateNotification("文件分享仅支持局域网直连")
+                stopSelf()
+                return@launch
+            }
             val pairedDevice = dataStoreManager.getLastConnectedDevice().first()
             if (pairedDevice == null) {
                 Log.w(TAG, "No paired Mac, cannot send")

@@ -242,10 +242,10 @@ class MacMediaPlayerService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Mac Media Player",
+            getString(R.string.mac_media_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Mac media playback controls"
+            description = getString(R.string.ui_mac_media_playback_controls)
             setShowBadge(false)
             setSound(null, null)
         }
@@ -335,26 +335,17 @@ class MacMediaPlayerService : Service() {
                 PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
                 PlaybackStateCompat.ACTION_STOP
 
-        // Parse ISO8601 timestamp to calculate elapsed time since reporting
-        var position =
-            if (elapsedTime >= 0) elapsedTime else (mediaSession?.controller?.playbackState?.position
-                ?: 0L)
-        if (isPlaying && !timestamp.isNullOrEmpty()) {
-            try {
-                val reportedAt = java.time.Instant.parse(timestamp).toEpochMilli()
-                val now = System.currentTimeMillis()
-                val diff = now - reportedAt
-                if (diff > 0) {
-                    position += (diff * playbackRate).toLong()
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to parse timestamp: $timestamp")
-            }
-        }
+        val duration = mediaSession?.controller?.metadata?.getLong(
+            MediaMetadataCompat.METADATA_KEY_DURATION
+        ) ?: 0L
+        val position = com.sameerasw.airsync.utils.MediaTimeline.positionFromRemote(
+            if (elapsedTime >= 0) elapsedTime else (mediaSession?.controller?.playbackState?.position ?: 0L),
+            timestamp, System.currentTimeMillis(), isPlaying, playbackRate, duration
+        )
 
         mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
-                .setState(state, position, playbackRate.toFloat())
+                .setState(state, position, if (isPlaying) playbackRate.toFloat() else 0f)
                 .setActions(actions)
                 .build()
         )
@@ -373,27 +364,27 @@ class MacMediaPlayerService : Service() {
         // Create media control actions
         val prevAction = NotificationCompat.Action(
             R.drawable.outline_skip_previous_24,
-            "Previous",
+            getString(R.string.mac_media_previous),
             createMediaActionPendingIntent("previous")
         )
 
         val playPauseAction = NotificationCompat.Action(
             if (isPlaying) R.drawable.outline_pause_24 else R.drawable.outline_play_arrow_24,
-            if (isPlaying) "Pause" else "Play",
+            getString(if (isPlaying) R.string.mac_media_pause else R.string.mac_media_play),
             createMediaActionPendingIntent(if (isPlaying) "pause" else "play")
         )
 
         val nextAction = NotificationCompat.Action(
             R.drawable.outline_skip_next_24,
-            "Next",
+            getString(R.string.mac_media_next),
             createMediaActionPendingIntent("next")
         )
 
         val dynamicIcon = com.sameerasw.airsync.utils.DeviceIconResolver.getLastDeviceIconRes(this)
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(dynamicIcon)
-            .setContentTitle(title.ifEmpty { "Mac Media Player" })
-            .setContentText(artist.ifEmpty { "Playing on Mac" })
+            .setContentTitle(title.ifEmpty { getString(R.string.mac_media_channel_name) })
+            .setContentText(artist.ifEmpty { getString(R.string.mac_media_playing_on_mac) })
             .setContentIntent(activityPendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
@@ -468,9 +459,13 @@ class MacMediaPlayerService : Service() {
                 val isPlaying =
                     it.controller.playbackState?.state == PlaybackStateCompat.STATE_PLAYING
                 val duration = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION)
-                val position = it.controller.playbackState?.position ?: 0L
+                val playback = it.controller.playbackState
                 val speed = it.controller.playbackState?.playbackSpeed?.toDouble() ?: 1.0
 
+                val position = com.sameerasw.airsync.utils.MediaTimeline.positionAt(
+                    playback?.position ?: 0L, playback?.lastPositionUpdateTime ?: 0L,
+                    android.os.SystemClock.elapsedRealtime(), isPlaying, speed, duration
+                )
                 updateMacMediaSession(title, artist, isPlaying, position, duration, null, speed)
             }
         }

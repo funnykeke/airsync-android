@@ -7,7 +7,7 @@ data class ConnectedDevice(
     val port: String,
     val lastConnected: Long,
     val lastSyncTime: Long? = null,
-    val isPlus: Boolean = false,
+    val isPlus: Boolean = true,
     val iconSyncCount: Int = 0,
     val lastIconSyncDate: String? = null,
     val symmetricKey: String? = null,

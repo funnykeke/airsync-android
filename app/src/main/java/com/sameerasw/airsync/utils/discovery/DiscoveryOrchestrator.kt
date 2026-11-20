@@ -148,6 +148,10 @@ object DiscoveryOrchestrator {
 
         CoroutineScope(Dispatchers.IO).launch {
             val ds = DataStoreManager.getInstance(context)
+            if (ds.getTransportMode().first() != "local") {
+                withContext(Dispatchers.Main) { stop(context) }
+                return@launch
+            }
             val expandNetworkingEnabled = try {
                 ds.getExpandNetworkingEnabled().first()
             } catch (e: Exception) {
@@ -155,6 +159,7 @@ object DiscoveryOrchestrator {
             }
 
             withContext(Dispatchers.Main) {
+                if (!isRunning) return@withContext
                 // Configure backend modes
                 mdnsBackend.setModeWithContext(context, currentMode)
                 udpBackend.setModeWithContext(context, currentMode)

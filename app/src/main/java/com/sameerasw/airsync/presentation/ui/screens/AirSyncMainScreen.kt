@@ -112,11 +112,9 @@ import com.sameerasw.airsync.presentation.ui.components.buttons.ListExpandToggle
 import com.sameerasw.airsync.presentation.ui.components.cards.ConnectionStatusCard
 import com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem
 import com.sameerasw.airsync.presentation.ui.components.cards.LastConnectedDeviceCard
-import com.sameerasw.airsync.presentation.ui.components.cards.RateAppCard
 import com.sameerasw.airsync.presentation.ui.components.cards.RemoteFunctionsCard
 import com.sameerasw.airsync.presentation.ui.components.dialogs.ConnectionDialog
 import com.sameerasw.airsync.presentation.ui.components.sheets.HelpSupportBottomSheet
-import com.sameerasw.airsync.presentation.ui.composables.WelcomeScreen
 import com.sameerasw.airsync.presentation.ui.models.AirSyncTab
 import com.sameerasw.airsync.presentation.ui.modifiers.BlurDirection
 import com.sameerasw.airsync.presentation.ui.modifiers.liquidRipple
@@ -135,6 +133,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONObject
 import java.net.URLDecoder
 
 @OptIn(
@@ -157,7 +156,6 @@ fun AirSyncMainScreen(
 ) {
     val context = LocalContext.current
     val dataStoreManager = remember { DataStoreManager.getInstance(context) }
-    val bleSyncEnabled by dataStoreManager.getBleSyncEnabled().collectAsState(initial = false)
     var showConfigureLastDevice by rememberSaveable { mutableStateOf(false) }
     val viewModel: AirSyncViewModel = androidx.lifecycle.viewmodel.compose.viewModel {
         AirSyncViewModel.create(context)
@@ -178,12 +176,8 @@ fun AirSyncMainScreen(
     val settingsScrollState = rememberScrollState()
     var hasProcessedQrDialog by remember { mutableStateOf(false) }
     var hasAppliedInitialTab by remember { mutableStateOf(false) }
-    var isWelcomeDismissed by rememberSaveable { mutableStateOf(false) }
-    var hasSeenWelcomeThisSession by rememberSaveable { mutableStateOf(false) }
 
-    if (!uiState.isOnboardingCompleted) {
-        hasSeenWelcomeThisSession = true
-    }
+
 
     var activeSettingsCategory by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -218,7 +212,14 @@ fun AirSyncMainScreen(
         scope.launch {
             try {
                 HapticUtil.performLightTick(haptics)
-                com.sameerasw.airsync.utils.MacRemoteActions.sendRemoteAction(action, value)
+                val json = JSONObject()
+                val mediaActions = setOf("vol_set", "vol_mute", "vol_up", "vol_down", "media_play_pause", "media_next", "media_prev")
+                json.put("type", if (action in mediaActions) "macMediaControl" else "remoteControl")
+                val data = JSONObject()
+                data.put("action", action)
+                if (value != null) data.put("value", value)
+                json.put("data", data)
+                WebSocketUtil.sendMessage(json.toString())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -228,7 +229,7 @@ fun AirSyncMainScreen(
     val pagerState =
         rememberPagerState(
             initialPage = initialPage,
-            pageCount = { if (uiState.isConnected) 4 else 2 })
+            pageCount = { if (uiState.isConnected) { if (uiState.transportMode == "relay") 3 else 4 } else 2 })
 
     LaunchedEffect(pagerState.currentPage) {
         activeSettingsCategory = null
@@ -307,7 +308,7 @@ fun AirSyncMainScreen(
         val criticalPermissions =
             com.sameerasw.airsync.utils.PermissionUtil.getCriticalMissingPermissions(context)
         if (criticalPermissions.isNotEmpty()) {
-            Toast.makeText(context, "Missing permissions", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.ui_missing_permissions), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -333,18 +334,12 @@ fun AirSyncMainScreen(
                             viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
                             WebSocketUtil.disconnect(context)
                             viewModel.showAuthFailure(
-                                "Connection failed due to authentication failure. Please check the encryption key by re-scanning the QR code."
+                                context.getString(R.string.auth_failure_message)
                             )
                         }
                     },
                     onConnectionStatus = { connected ->
                         connectionResult = connected
-                    },
-                    onMessage = { response ->
-                        scope.launch(Dispatchers.Main) {
-                            Log.d("AirSyncMainScreen", "Message received: $response")
-                            viewModel.setResponse("Received: $response")
-                        }
                     }
                 )
 
@@ -363,17 +358,15 @@ fun AirSyncMainScreen(
                 }
                 viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
                 WebSocketUtil.disconnect(context)
-                Toast.makeText(context, "Connection Timed Out", Toast.LENGTH_SHORT).show()
-                viewModel.setResponse("Connection Timed Out")
+                Toast.makeText(context, context.getString(R.string.toast_connection_timed_out), Toast.LENGTH_SHORT).show()
+                viewModel.setResponse(context.getString(R.string.toast_connection_timed_out))
             } else {
                 val connected = result
                 viewModel.setConnectionStatus(isConnected = connected, isConnecting = false)
                 if (connected) {
-                    viewModel.setResponse("Connected successfully!")
-                    val plusStatus = uiState.lastConnectedDevice?.isPlus ?: isPlus
-                    viewModel.saveLastConnectedDevice(pcName, plusStatus, symmetricKey)
+                    viewModel.setResponse(context.getString(R.string.toast_connected_success))
                 } else {
-                    viewModel.setResponse("Failed to connect")
+                    viewModel.setResponse(context.getString(R.string.connection_failed))
                 }
             }
         }
@@ -384,7 +377,7 @@ fun AirSyncMainScreen(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri == null) {
-            Toast.makeText(context, "Export cancelled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_export_cancelled), Toast.LENGTH_SHORT).show()
             viewModel.setLoading(false)
             return@rememberLauncherForActivityResult
         }
@@ -402,13 +395,13 @@ fun AirSyncMainScreen(
                     out.write(json.toByteArray(Charsets.UTF_8))
                 }
                 scope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_export_success), Toast.LENGTH_SHORT).show()
                     viewModel.setLoading(false)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 scope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.toast_export_failed_detail, e.message ?: ""), Toast.LENGTH_LONG).show()
                     viewModel.setLoading(false)
                 }
             }
@@ -420,7 +413,7 @@ fun AirSyncMainScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) {
-            Toast.makeText(context, "Import cancelled", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_import_cancelled), Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
 
@@ -431,7 +424,7 @@ fun AirSyncMainScreen(
                     ?.use { it.readText() }
                 if (input == null) {
                     scope.launch(Dispatchers.Main) {
-                        Toast.makeText(context, "Failed to read file", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.toast_failed_read_file), Toast.LENGTH_LONG).show()
                         viewModel.setLoading(false)
                     }
                     return@launch
@@ -440,10 +433,10 @@ fun AirSyncMainScreen(
                 val success = viewModel.importDataFromJson(context, input)
                 scope.launch(Dispatchers.Main) {
                     if (success) {
-                        Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_import_success), Toast.LENGTH_SHORT).show()
                         viewModel.initializeState(context)
                     } else {
-                        Toast.makeText(context, "Import failed or invalid file", Toast.LENGTH_LONG)
+                        Toast.makeText(context, context.getString(R.string.toast_import_failed), Toast.LENGTH_LONG)
                             .show()
                     }
                     viewModel.setLoading(false)
@@ -451,7 +444,7 @@ fun AirSyncMainScreen(
             } catch (e: Exception) {
                 e.printStackTrace()
                 scope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, "Import error: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.toast_import_error, e.message ?: ""), Toast.LENGTH_LONG).show()
                     viewModel.setLoading(false)
                 }
             }
@@ -491,7 +484,7 @@ fun AirSyncMainScreen(
 
                     val queryPart = uri.toString().substringAfter('?', "")
                     if (queryPart.isNotEmpty()) {
-                        val params = queryPart.split('?')
+                        val params = queryPart.replace('?', '&').split('&')
                         val paramMap = params.associate { param ->
                             val parts = param.split('=', limit = 2)
                             val key = parts.getOrNull(0) ?: ""
@@ -500,15 +493,15 @@ fun AirSyncMainScreen(
                         }
                         pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
                         isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
-                        symmetricKey = paramMap["key"]
+                        symmetricKey = paramMap["key"]?.let { android.net.Uri.decode(it) }
                     }
 
                     if (ip.isNotEmpty() && port.isNotEmpty()) {
                         // Update UI state with scanned values
+                        viewModel.setTransportMode(context, "local")
                         viewModel.updateIpAddress(ip)
                         viewModel.updatePort(port)
                         viewModel.updateManualPcName(pcName ?: "")
-                        viewModel.updateManualIsPlus(isPlus)
                         if (!symmetricKey.isNullOrEmpty()) {
                             viewModel.updateSymmetricKey(symmetricKey)
                         }
@@ -519,12 +512,12 @@ fun AirSyncMainScreen(
                             connect()
                         }
                     } else {
-                        Toast.makeText(context, "Invalid QR code format", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_invalid_qr), Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     Toast.makeText(
                         context,
-                        "Failed to parse QR code: ${e.message}",
+                        context.getString(R.string.toast_qr_parse_failed, e.message ?: ""),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -538,7 +531,7 @@ fun AirSyncMainScreen(
             WebSocketUtil.disconnect(context, manual = true)
             viewModel.setConnectionStatus(isConnected = false, isConnecting = false)
             viewModel.clearClipboardHistory()
-            viewModel.setResponse("Disconnected")
+            viewModel.setResponse(context.getString(R.string.disconnected))
         }
     }
 
@@ -580,6 +573,7 @@ fun AirSyncMainScreen(
             if (uiState.isConnected) {
                 // If already connected, don't show dialog
                 hasProcessedQrDialog = true
+                viewModel.setDialogVisible(false)
             } else if (uiState.isDialogVisible) {
                 // Dialog is being shown, mark as processed
                 hasProcessedQrDialog = true
@@ -613,16 +607,10 @@ fun AirSyncMainScreen(
         fabExpanded = false
     }
 
-    // Start/stop clipboard sync based on connection status and settings
-    LaunchedEffect(uiState.isConnected, uiState.isClipboardSyncEnabled) {
-        if (uiState.isConnected && uiState.isClipboardSyncEnabled) {
-            // Register callback to track clipboard history
-            ClipboardSyncManager.setOnClipboardSentCallback { text ->
-                viewModel.addClipboardEntry(text, isFromPc = false)
-            }
-            ClipboardSyncManager.startSync(context)
-        } else {
-            ClipboardSyncManager.stopSync(context)
+    // The foreground service owns monitoring; the screen only observes history.
+    LaunchedEffect(Unit) {
+        ClipboardSyncManager.setOnClipboardSentCallback { text ->
+            viewModel.addClipboardEntry(text, isFromPc = false)
         }
     }
 
@@ -630,7 +618,7 @@ fun AirSyncMainScreen(
         com.sameerasw.airsync.utils.WebSocketMessageHandler.setOnClipboardEntryCallback { text ->
             Log.d(
                 "AirSyncMainScreen",
-                "Incoming clipboard update via WebSocketMessageHandler: ${text.take(50)}"
+                "Incoming clipboard update via WebSocketMessageHandler"
             )
             viewModel.addClipboardEntry(text, isFromPc = true)
         }
@@ -650,15 +638,15 @@ fun AirSyncMainScreen(
     if (uiState.showAuthFailureDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissAuthFailure() },
-            title = { Text("Connection failed") },
+            title = { Text(stringResource(R.string.connection_failed)) },
             text = {
                 Text(uiState.authFailureMessage.ifEmpty {
-                    "Authentication failed. Please re-scan the QR code on your Mac to ensure the encryption key matches."
+                    stringResource(R.string.auth_failure_message)
                 })
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissAuthFailure() }) {
-                    Text("OK")
+                    Text(stringResource(R.string.ui_ok))
                 }
             }
         )
@@ -695,13 +683,18 @@ fun AirSyncMainScreen(
     DisposableEffect(Unit) {
         onDispose {
             ClipboardSyncManager.setOnClipboardSentCallback(null)
-            ClipboardSyncManager.stopSync(context)
         }
     }
 
     // Define tabs
-    val tabs = remember(uiState.isConnected) {
-        if (uiState.isConnected) {
+    val tabs = remember(uiState.isConnected, uiState.transportMode) {
+        if (uiState.isConnected && uiState.transportMode == "relay") {
+            listOf(
+                AirSyncTab(R.string.tab_connect, Icons.Rounded.Phonelink, 0),
+                AirSyncTab(R.string.tab_clipboard, Icons.Rounded.ContentPaste, 1),
+                AirSyncTab(R.string.tab_settings, Icons.Rounded.Settings, 2)
+            )
+        } else if (uiState.isConnected) {
             listOf(
                 AirSyncTab(R.string.tab_connect, Icons.Rounded.Phonelink, 0),
                 AirSyncTab(R.string.tab_remote, Icons.Rounded.Gamepad, 1),
@@ -778,7 +771,8 @@ fun AirSyncMainScreen(
                         ),
                     state = pagerState
                 ) { page ->
-                    when (page) {
+                    val contentPage = if (uiState.isConnected && uiState.transportMode == "relay" && page > 0) page + 1 else page
+                    when (contentPage) {
                         0 -> {
                             // Connect tab content
                             Column(
@@ -799,19 +793,6 @@ fun AirSyncMainScreen(
 
                                 RoundedCardContainer {
 
-                                    // Rating Prompt Card
-                                    AnimatedVisibility(
-                                        visible = uiState.shouldShowRatingPrompt,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        RateAppCard(
-                                            onDismiss = { viewModel.setRatingCardDismissed() },
-                                            onRate = { viewModel.setAppRated() }
-                                        )
-                                    }
-
-
                                     // Connection Status Card
                                     ConnectionStatusCard(
                                         isConnected = uiState.isConnected,
@@ -828,7 +809,7 @@ fun AirSyncMainScreen(
 
                                     // Remote Functions Card (Lock Screen, etc.)
                                     AnimatedVisibility(
-                                        visible = uiState.isConnected,
+                                        visible = uiState.isConnected && uiState.transportMode == "local",
                                         enter = expandVertically() + fadeIn(),
                                         exit = shrinkVertically() + fadeOut()
                                     ) {
@@ -839,7 +820,7 @@ fun AirSyncMainScreen(
                                 }
 
                                 AnimatedVisibility(
-                                    visible = !uiState.isConnected && !uiState.isAppPaused,
+                                    visible = !uiState.isConnected && !uiState.isAppPaused && uiState.transportMode == "local",
                                     enter = expandVertically() + fadeIn(),
                                     exit = shrinkVertically() + fadeOut()
                                 ) {
@@ -954,7 +935,7 @@ fun AirSyncMainScreen(
                                                                 LoadingIndicator()
 
                                                                 Text(
-                                                                    text = "Scanning...",
+                                                                    text = stringResource(R.string.ui_scanning),
                                                                     style = MaterialTheme.typography.bodyMedium,
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     modifier = Modifier.padding(
@@ -981,16 +962,16 @@ fun AirSyncMainScreen(
                                                                         val bestIp = device.getBestIp()
                                                                         val devicePort = device.port.toString()
                                                                         val deviceName = device.name
-                                                                        
+
                                                                         viewModel.updateIpAddress(bestIp)
                                                                         viewModel.updatePort(devicePort)
                                                                         viewModel.updateManualPcName(deviceName)
-                                                                        
+
                                                                         val savedKey = viewModel.getSymmetricKeyForDevice(deviceName)
                                                                         if (savedKey != null) {
                                                                             viewModel.updateSymmetricKey(savedKey)
                                                                         }
-                                                                        
+
                                                                         connect(
                                                                             deviceId = device.id,
                                                                             ipAddress = bestIp,
@@ -1090,7 +1071,7 @@ fun AirSyncMainScreen(
                                                                 } else {
                                                                     Icon(
                                                                         Icons.AutoMirrored.Filled.ArrowForward,
-                                                                        contentDescription = "Connect",
+                                                                        contentDescription = stringResource(R.string.ui_connect),
                                                                         modifier = Modifier.size(20.dp),
                                                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                                                     )
@@ -1134,18 +1115,7 @@ fun AirSyncMainScreen(
                                                     }
                                                 )
 
-                                                IconToggleItem(
-                                                    iconRes = R.drawable.rounded_bluetooth_24,
-                                                    title = stringResource(R.string.setting_nearby_connection_title),
-                                                    description = stringResource(R.string.setting_nearby_connection_desc),
-                                                    isChecked = bleSyncEnabled,
-                                                    onCheckedChange = { enabled ->
-                                                        scope.launch {
-                                                            dataStoreManager.setBleSyncEnabled(enabled)
-                                                            dataStoreManager.setBleAutoConnectEnabled(enabled)
-                                                        }
-                                                    }
-                                                )
+
                                             }
                                         }
                                     }
@@ -1434,21 +1404,6 @@ fun AirSyncMainScreen(
             )
         }
 
-        // Welcome Screen Overlay
-        AnimatedVisibility(
-            visible = (!uiState.isOnboardingCompleted || hasSeenWelcomeThisSession) && !isWelcomeDismissed,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-            modifier = Modifier.zIndex(100f)
-        ) {
-            WelcomeScreen(
-                viewModel = viewModel,
-                onBeginClick = {
-                    isWelcomeDismissed = true
-                    viewModel.setOnboardingCompleted(true)
-                }
-            )
-        }
     }
 }
 
@@ -1486,7 +1441,7 @@ private fun MainFAB(
         }
     ) {
         if (currentTab?.title == R.string.tab_settings && activeSettingsCategory != null) {
-            Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+            Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.ui_back))
         } else {
             when (currentTab?.title) {
                 R.string.tab_remote -> {
@@ -1494,16 +1449,16 @@ private fun MainFAB(
                 }
 
                 R.string.tab_clipboard -> {
-                    Icon(Icons.Rounded.Delete, contentDescription = "Clear History")
+                    Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.ui_clear_history))
                 }
 
                 else -> {
                     if (isConnected) {
-                        Icon(imageVector = Icons.Filled.LinkOff, contentDescription = "Disconnect")
+                        Icon(imageVector = Icons.Filled.LinkOff, contentDescription = stringResource(R.string.ui_disconnect))
                     } else if (isAppPaused) {
                         Icon(painter = painterResource(R.drawable.rounded_play_arrow_24), contentDescription = stringResource(R.string.resume))
                     } else {
-                        Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = "Scan QR")
+                        Icon(imageVector = Icons.Filled.QrCodeScanner, contentDescription = stringResource(R.string.ui_scan_qr))
                     }
                 }
             }
@@ -1571,7 +1526,6 @@ private fun SettingsNavHost(
             onSendMessage = onSendMessage,
             onExport = pendingExportJson,
             onImport = onImport,
-            onResetOnboarding = { viewModel.resetOnboarding() },
             onShowHelp = onShowHelp,
             onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
             onAvatarLongClickWithPosition = onAvatarLongClickWithPosition,
@@ -1621,7 +1575,6 @@ private fun SettingsNavHost(
                         onSendMessage = onSendMessage,
                         onExport = pendingExportJson,
                         onImport = onImport,
-                        onResetOnboarding = { viewModel.resetOnboarding() },
                         onShowHelp = onShowHelp,
                         onToggleDeveloperMode = { viewModel.toggleDeveloperModeVisibility() },
                         onAvatarLongClickWithPosition = onAvatarLongClickWithPosition,

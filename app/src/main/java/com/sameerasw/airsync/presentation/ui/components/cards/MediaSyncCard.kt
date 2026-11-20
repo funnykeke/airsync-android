@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
@@ -20,8 +21,8 @@ fun MediaSyncCard(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         IconToggleItem(
             iconRes = R.drawable.rounded_music_cast_24,
-            title = "Send now playing",
-            description = "Share media playback details with desktop",
+            title = stringResource(R.string.ui_send_now_playing),
+            description = stringResource(R.string.ui_share_media_playback_details_with_desktop),
             isChecked = isSendNowPlayingEnabled,
             onCheckedChange = onToggleSendNowPlaying
         )
@@ -39,8 +40,8 @@ fun MediaSyncCard(
         }
         IconToggleItem(
             iconRes = R.drawable.rounded_smart_display_24,
-            title = "Show Mac Media Controls",
-            description = "Show media controls when Mac is playing music",
+            title = stringResource(R.string.ui_show_mac_media_controls),
+            description = stringResource(R.string.ui_show_media_controls_when_mac_is_playing_music),
             isChecked = isMacMediaControlsEnabled,
             onCheckedChange = onToggleMacMediaControls
         )

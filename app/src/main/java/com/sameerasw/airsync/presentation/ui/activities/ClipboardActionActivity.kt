@@ -141,7 +141,7 @@ private fun ClipboardActionScreen(
                             WebSocketUtil.sendMessage(json.toString())
                             uiState = ClipboardUiState.Success
                         } else {
-                            uiState = ClipboardUiState.Error("Not connected")
+                            uiState = ClipboardUiState.Error(context.getString(R.string.no_device_connected))
                         }
                         delay(1200)
                         onFinished()
@@ -173,8 +173,11 @@ private fun ClipboardActionScreen(
                         val ds = DataStoreManager.getInstance(context)
                         ds.setAppPaused(false)
                         ds.setUserManuallyDisconnected(false)
-                        val isDiscovery = runBlocking { ds.getDeviceDiscoveryEnabled().first() }
-                        com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.start(context, isDiscovery)
+                        val mode = runBlocking { ds.getTransportMode().first() }
+                        if (mode == "local") {
+                            val isDiscovery = runBlocking { ds.getDeviceDiscoveryEnabled().first() }
+                            com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.start(context, isDiscovery)
+                        }
                         com.sameerasw.airsync.service.AirSyncService.startScanning(context)
                         WebSocketUtil.requestAutoReconnect(context)
                         ShortcutUtil.refreshShortcuts(context, false)
@@ -219,7 +222,10 @@ private fun ClipboardActionScreen(
                             onFinished()
                         } else {
                             uiState = ClipboardUiState.Error(
-                                if (isShareAction) "Shared text empty" else "Clipboard empty"
+                                context.getString(
+                                    if (isShareAction) R.string.clipboard_shared_text_empty
+                                    else R.string.clipboard_empty
+                                )
                             )
                             delay(1500)
                             onFinished()
@@ -227,7 +233,7 @@ private fun ClipboardActionScreen(
                     }
                 }
             } catch (e: Exception) {
-                uiState = ClipboardUiState.Error("Failed")
+                uiState = ClipboardUiState.Error(context.getString(R.string.failed_to_send_clipboard))
                 delay(1500)
                 onFinished()
             }
@@ -313,7 +319,7 @@ private fun ClipboardActionScreenContent(
                             is ClipboardUiState.Success -> {
                                 Icon(
                                     imageVector = androidx.compose.material.icons.Icons.Rounded.CheckCircle,
-                                    contentDescription = "Success",
+                                    contentDescription = stringResource(R.string.ui_success),
                                     modifier = Modifier.size(28.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
@@ -322,7 +328,7 @@ private fun ClipboardActionScreenContent(
                             is ClipboardUiState.Error -> {
                                 Icon(
                                     imageVector = androidx.compose.material.icons.Icons.Rounded.Error,
-                                    contentDescription = "Error",
+                                    contentDescription = stringResource(R.string.ui_error),
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(28.dp)
                                 )

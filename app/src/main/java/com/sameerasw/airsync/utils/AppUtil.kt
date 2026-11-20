@@ -34,7 +34,7 @@ object AppUtil {
                             NotificationApp(
                                 packageName = appInfo.packageName,
                                 appName = pm.getApplicationLabel(appInfo).toString(),
-                                isEnabled = true,
+                                isEnabled = false,
                                 icon = pm.getApplicationIcon(appInfo),
                                 isSystemApp = isSystemApp(appInfo),
                                 lastUpdated = System.currentTimeMillis()
@@ -71,7 +71,7 @@ object AppUtil {
                 isSystemApp = installedApp.isSystemApp
             )
                 ?: // New app, use defaults
-                installedApp
+                installedApp.copy(isEnabled = false)
         }.sortedBy { it.appName.lowercase() }
     }
 

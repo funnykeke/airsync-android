@@ -140,8 +140,8 @@ class UdpDiscoveryBackend : DiscoveryBackend {
             acquireMulticastLock(context)
             startBroadcasting(context)
         } else {
-            Log.d(TAG, "Switched to PASSIVE discovery (listening only)")
-            acquireMulticastLock(context)
+            Log.d(TAG, "Switched to PASSIVE discovery (releasing multicast lock for battery)")
+            releaseMulticastLock()
         }
     }
 

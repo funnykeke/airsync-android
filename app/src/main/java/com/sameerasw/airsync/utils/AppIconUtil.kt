@@ -56,7 +56,9 @@ object AppIconUtil {
             val bitmap = drawableToBitmap(drawable)
             val outputStream = ByteArrayOutputStream()
 
-            // Compress as PNG with high quality
+            // 保持 PNG 格式（Mac 端按 .png 后缀硬编码写入，换格式会加载失败）。
+            // 128px 已是标准尺寸，PNG 在这个尺寸下单张通常 5~15KB，
+            // 配合 relay 的 8MB 帧上限足够用，无需再压。
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
             val byteArray = outputStream.toByteArray()
 

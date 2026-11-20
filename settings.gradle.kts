@@ -1,12 +1,8 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
+        maven("https://maven.aliyun.com/repository/public")
+        maven("https://maven.aliyun.com/repository/gradle-plugin")
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -17,16 +13,12 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        maven("https://maven.aliyun.com/repository/public")
+        maven("https://maven.aliyun.com/repository/google")
         google()
         mavenCentral()
-        maven("https://jitpack.io")
     }
 }
 
 rootProject.name = "AirSync"
 include(":app")
-include(":island-sdk")
-project(":island-sdk").projectDir = file("../essentials/island-sdk")
-include(":island-sdk-compose")
-project(":island-sdk-compose").projectDir = file("../essentials/island-sdk-compose")
-

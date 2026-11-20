@@ -267,14 +267,14 @@ fun RemoteControlScreen(
                 onClick = { sendRemoteAction("escape") },
                 modifier = Modifier.padding(horizontal = 4.dp)
             ) {
-                Text("Esc")
+                Text("退出")
             }
 
             OutlinedButton(
                 onClick = { sendRemoteAction("space") },
                 modifier = Modifier.padding(horizontal = 4.dp)
             ) {
-                Icon(Icons.Default.SpaceBar, "Space", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.SpaceBar, "空格", modifier = Modifier.size(18.dp))
             }
 
             OutlinedButton(
@@ -288,7 +288,7 @@ fun RemoteControlScreen(
             ) {
                 Icon(
                     painter = painterResource(id = if (isWide) R.drawable.rounded_compare_arrows_24 else R.drawable.rounded_mobiledata_arrows_24),
-                    contentDescription = "Flip Layout",
+                    contentDescription = "交换布局",
                     modifier = Modifier.size(18.dp)
                 )
             }

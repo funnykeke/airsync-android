@@ -10,7 +10,6 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -63,7 +62,6 @@ fun CrashReportBottomSheet(
 
             item {
                 RoundedCardContainer {
-                    // Copy report
                     IconToggleItem(
                         title = stringResource(R.string.crash_copy),
                         description = stringResource(R.string.crash_copy_desc),
@@ -74,7 +72,6 @@ fun CrashReportBottomSheet(
                         }
                     )
 
-                    // Save to file
                     IconToggleItem(
                         title = stringResource(R.string.crash_save_file),
                         description = stringResource(R.string.crash_save_file_desc),
@@ -85,18 +82,6 @@ fun CrashReportBottomSheet(
                         }
                     )
 
-                    // Email report
-                    IconToggleItem(
-                        title = stringResource(R.string.crash_email),
-                        description = stringResource(R.string.crash_email_desc),
-                        iconRes = R.drawable.outline_feedback_24,
-                        showToggle = false,
-                        onClick = {
-                            emailReport(context, report)
-                        }
-                    )
-
-                    // Open GitHub issue
                     IconToggleItem(
                         title = stringResource(R.string.crash_github),
                         description = stringResource(R.string.crash_github_desc),
@@ -121,9 +106,9 @@ private fun copyToClipboard(context: Context, text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("AirSync Crash Report", text)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Report copied to clipboard", Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, "Failed to copy report", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.crash_copied), Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {
+        Toast.makeText(context, context.getString(R.string.crash_copy_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -157,30 +142,16 @@ private fun saveLogToFile(context: Context, text: String, showToast: Boolean): U
     return null
 }
 
-private fun emailReport(context: Context, text: String) {
-    try {
-        val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("mailto:mail@sameerasw.com")
-            putExtra(Intent.EXTRA_SUBJECT, "AirSync Android Crash Report")
-            val bodyText = if (text.length > 4000) text.substring(0, 4000) + "\n...[truncated]" else text
-            putExtra(Intent.EXTRA_TEXT, bodyText)
-        }
-        context.startActivity(Intent.createChooser(emailIntent, "Send Email"))
-    } catch (e: Exception) {
-        Toast.makeText(context, "No email client found", Toast.LENGTH_SHORT).show()
-    }
-}
-
 private fun openGitHubIssue(context: Context, text: String) {
     try {
         val uri = saveLogToFile(context, text, showToast = false)
         if (uri != null) {
             Toast.makeText(context, context.getString(R.string.crash_github_hint), Toast.LENGTH_LONG).show()
         }
-        val url = "https://github.com/sameerasw/airsync-android/issues/new"
+        val url = "https://github.com/funnykeke/airsync-android/issues/new"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         context.startActivity(intent)
-    } catch (e: Exception) {
-        Toast.makeText(context, "Could not open link", Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {
+        Toast.makeText(context, context.getString(R.string.error_could_not_open_link), Toast.LENGTH_SHORT).show()
     }
 }

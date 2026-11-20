@@ -21,7 +21,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:adjustViewBounds="true"
-            android:contentDescription="Device image"
+            android:contentDescription="@string/ui_connected_mac_preview"
             android:padding="0dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_laptop_24" />
@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:background="@drawable/widget_tap_hint_bg"
-            android:text="Tap to reconnect"
+            android:text="@string/widget_tap_to_reconnect"
             android:textColor="@color/widget_primary_text"
             android:textSize="12sp"
             android:textStyle="bold"

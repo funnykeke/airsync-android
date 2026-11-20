@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
@@ -25,14 +26,14 @@ fun ClipboardFeaturesCard(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         IconToggleItem(
             iconRes = R.drawable.ic_clipboard_24,
-            title = "Clipboard Sync",
-            description = "Update Android clipboard automatically",
+            title = stringResource(R.string.ui_clipboard_sync),
+            description = stringResource(R.string.ui_update_android_clipboard_automatically),
             isChecked = isClipboardSyncEnabled,
             onCheckedChange = onToggleClipboardSync
         )
         IconToggleItem(
             iconRes = R.drawable.outline_open_in_browser_24,
-            title = "Continue browsing",
+            title = stringResource(R.string.ui_continue_browsing),
             description = continueBrowsingSubtitle,
             isChecked = isContinueBrowsingEnabled,
             onCheckedChange = onToggleContinueBrowsing,
@@ -40,8 +41,8 @@ fun ClipboardFeaturesCard(
         )
         IconToggleItem(
             iconRes = R.drawable.rounded_history_24,
-            title = "Keep previous link",
-            description = "Without replacing",
+            title = stringResource(R.string.ui_keep_previous_link),
+            description = stringResource(R.string.ui_without_replacing),
             isChecked = isKeepPreviousLinkEnabled,
             onCheckedChange = onToggleKeepPreviousLink,
             enabled = isContinueBrowsingToggleEnabled

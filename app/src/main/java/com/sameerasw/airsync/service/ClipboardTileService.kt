@@ -103,14 +103,14 @@ class ClipboardTileService : TileService() {
                     Log.e(TAG, "Error launching clipboard activity", e)
                     Toast.makeText(
                         this@ClipboardTileService,
-                        "Error launching action",
+                        getString(R.string.toast_error_launching_action),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
             } else {
                 Toast.makeText(
                     this@ClipboardTileService,
-                    "Not connected to any device",
+                    getString(R.string.no_device_connected),
                     Toast.LENGTH_SHORT
                 ).show()
                 updateTileState(false)

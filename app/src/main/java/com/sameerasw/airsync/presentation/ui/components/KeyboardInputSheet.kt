@@ -1,6 +1,7 @@
 @file:Suppress("DEPRECATION")
 package com.sameerasw.airsync.presentation.ui.components
 
+import androidx.compose.ui.res.stringResource
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -810,7 +811,7 @@ private fun NavigationRow(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Keyboard,
-                    contentDescription = "Switch Keyboard",
+                    contentDescription = stringResource(R.string.ui_switch_keyboard),
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

@@ -12,6 +12,7 @@
 
 # Package Files #
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
@@ -36,3 +37,7 @@ local.properties
 .vscode/launch.json
 build/reports/problems/problems-report.html
 .agents/
+signing.properties
+*.keystore
+__pycache__/
+*.pyc

@@ -1,6 +1,8 @@
 @file:Suppress("DEPRECATION")
 package com.sameerasw.airsync.presentation.ui.components
 
+import androidx.compose.ui.res.stringResource
+import com.sameerasw.airsync.R
 import android.graphics.Bitmap
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
@@ -96,17 +98,27 @@ fun FloatingMediaPlayer(
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
 
-    var currentElapsedTimeMs by remember(musicInfo) { mutableStateOf(musicInfo?.elapsedTime ?: 0L) }
+    // Capture wall time only when a remote snapshot arrives; animation then uses
+    // elapsedRealtime so a phone clock adjustment cannot move the seekbar.
+    val timelineAnchor = remember(musicInfo) {
+        val position = musicInfo?.let {
+            com.sameerasw.airsync.utils.MediaTimeline.positionFromRemote(
+                it.elapsedTime, it.timestamp, System.currentTimeMillis(),
+                it.isPlaying, it.playbackRate, it.duration
+            )
+        } ?: 0L
+        position to android.os.SystemClock.elapsedRealtime()
+    }
+    var currentElapsedTimeMs by remember(timelineAnchor) { mutableStateOf(timelineAnchor.first) }
 
-    LaunchedEffect(musicInfo?.isPlaying, musicInfo?.elapsedTime) {
+    LaunchedEffect(musicInfo, timelineAnchor) {
         if (musicInfo?.isPlaying == true) {
-            var lastTime = System.currentTimeMillis()
             while (true) {
-                kotlinx.coroutines.delay(500)
-                val now = System.currentTimeMillis()
-                val delta = (now - lastTime) * ((musicInfo.playbackRate).toFloat())
-                currentElapsedTimeMs += delta.toLong()
-                lastTime = now
+                currentElapsedTimeMs = com.sameerasw.airsync.utils.MediaTimeline.positionAt(
+                    timelineAnchor.first, timelineAnchor.second, android.os.SystemClock.elapsedRealtime(),
+                    true, musicInfo.playbackRate, musicInfo.duration
+                )
+                kotlinx.coroutines.delay(250)
             }
         }
     }
@@ -216,7 +228,7 @@ fun FloatingMediaPlayer(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.KeyboardArrowUp,
-                            contentDescription = "Expand",
+                            contentDescription = stringResource(R.string.ui_expand),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -228,7 +240,7 @@ fun FloatingMediaPlayer(
                     ) {
                         Text(
                             text = musicInfo?.title?.takeIf { it.isNotEmpty() }
-                                ?: "Nothing Playing",
+                                ?: stringResource(R.string.media_nothing_playing),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -236,7 +248,7 @@ fun FloatingMediaPlayer(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = musicInfo?.artist?.takeIf { it.isNotEmpty() } ?: "from your Mac",
+                            text = musicInfo?.artist?.takeIf { it.isNotEmpty() } ?: stringResource(R.string.media_from_your_mac),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -292,7 +304,7 @@ fun FloatingMediaPlayer(
                         }) {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Collapse",
+                                contentDescription = stringResource(R.string.ui_collapse),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -387,7 +399,7 @@ fun FloatingMediaPlayer(
                                 ) {
                                     Icon(
                                         Icons.Rounded.SkipPrevious,
-                                        contentDescription = "Previous",
+                                        contentDescription = stringResource(R.string.ui_previous),
                                         modifier = Modifier.size(36.dp)
                                     )
                                 }
@@ -429,7 +441,7 @@ fun FloatingMediaPlayer(
                                 ) {
                                     Icon(
                                         Icons.Rounded.SkipNext,
-                                        contentDescription = "Next",
+                                        contentDescription = stringResource(R.string.ui_next),
                                         modifier = Modifier.size(36.dp)
                                     )
                                 }
@@ -448,7 +460,7 @@ fun FloatingMediaPlayer(
                         IconButton(onClick = onToggleMute) {
                             Icon(
                                 imageVector = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                contentDescription = "Mute",
+                                contentDescription = stringResource(R.string.ui_mute),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }

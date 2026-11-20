@@ -18,7 +18,8 @@ data class AudioInfo(
     val positionTimestampMs: Long = 0L,
     val isBuffering: Boolean = false,
     // New: like status for current media ("liked", "not_liked", or "none")
-    val likeStatus: String = "none"
+    val likeStatus: String = "none",
+    val playbackRate: Double = 1.0
 )
 
 data class MediaInfo(
@@ -32,5 +33,6 @@ data class MediaInfo(
     val positionTimestampMs: Long = 0L,
     val isBuffering: Boolean = false,
     // New: like status for current media ("liked", "not_liked", or "none")
-    val likeStatus: String = "none"
+    val likeStatus: String = "none",
+    val playbackRate: Double = 1.0
 )

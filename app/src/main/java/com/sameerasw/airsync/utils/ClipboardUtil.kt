@@ -40,7 +40,7 @@ object ClipboardUtil {
                 context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clipData = ClipData.newPlainText("AirSync", text)
             clipboardManager.setPrimaryClip(clipData)
-            Log.d(TAG, "Text set to clipboard: ${text.take(50)}...")
+            Log.d(TAG, "Text set to clipboard")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error setting clipboard text: ${e.message}")
@@ -63,7 +63,7 @@ object ClipboardUtil {
             try {
                 val clipText = getClipboardText(context)
                 if (!clipText.isNullOrEmpty()) {
-                    Log.d(TAG, "Clipboard changed: ${clipText.take(50)}...")
+                    Log.d(TAG, "Clipboard changed")
                     onClipboardChanged(clipText)
                 }
             } catch (e: Exception) {

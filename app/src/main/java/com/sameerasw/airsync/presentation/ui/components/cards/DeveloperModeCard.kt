@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -38,13 +39,11 @@ fun DeveloperModeCard(
     onSendDeviceStatus: () -> Unit,
     onExportData: () -> Unit,
     onImportData: () -> Unit,
-    onResetOnboarding: () -> Unit,
     isIconSyncLoading: Boolean,
     iconSyncMessage: String,
     onManualSyncIcons: () -> Unit,
     onClearIconSyncMessage: () -> Unit,
     isConnected: Boolean,
-    onRestartBleServer: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalHapticFeedback.current
@@ -59,7 +58,7 @@ fun DeveloperModeCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             IconToggleItem(
                 iconRes = R.drawable.rounded_troubleshoot_24,
-                title = "Developer Mode",
+                title = stringResource(R.string.ui_developer_mode),
                 isChecked = isDeveloperMode,
                 onCheckedChange = onToggleDeveloperMode
             )
@@ -72,7 +71,7 @@ fun DeveloperModeCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        "Test Functions",
+                        stringResource(R.string.dev_section_test_functions),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -85,7 +84,7 @@ fun DeveloperModeCard(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
-                        Text("Send Device Info")
+                        Text(stringResource(R.string.dev_send_device_info))
                     }
 
                     Button(
@@ -96,7 +95,7 @@ fun DeveloperModeCard(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
-                        Text("Send Test Notification")
+                        Text(stringResource(R.string.dev_send_test_notification))
                     }
 
                     Button(
@@ -107,7 +106,7 @@ fun DeveloperModeCard(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading
                     ) {
-                        Text("Send Device Status")
+                        Text(stringResource(R.string.dev_send_device_status))
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -119,7 +118,7 @@ fun DeveloperModeCard(
                             modifier = Modifier.weight(1f),
                             enabled = !isLoading
                         ) {
-                            Text("Export Data")
+                            Text(stringResource(R.string.dev_export_data))
                         }
 
                         Button(
@@ -130,36 +129,17 @@ fun DeveloperModeCard(
                             modifier = Modifier.weight(1f),
                             enabled = !isLoading
                         ) {
-                            Text("Import Data")
+                            Text(stringResource(R.string.dev_import_data))
                         }
                     }
 
-                    Button(
-                        onClick = {
-                            HapticUtil.performClick(haptics)
-                            onResetOnboarding()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading
-                    ) {
-                        Text("Reset Onboarding")
-                    }
 
-                    onRestartBleServer?.let { restartBle ->
-                        Button(
-                            onClick = {
-                                HapticUtil.performClick(haptics)
-                                restartBle()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Restart BLE Server")
-                        }
-                    }
+
+
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Icons",
+                        stringResource(R.string.dev_section_icons),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -180,7 +160,11 @@ fun DeveloperModeCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(if (isIconSyncLoading) "Syncing Icons..." else "Sync App Icons")
+                        Text(
+                            stringResource(
+                                if (isIconSyncLoading) R.string.dev_syncing_icons else R.string.dev_sync_app_icons
+                            )
+                        )
                     }
 
                     AnimatedVisibility(
@@ -188,11 +172,12 @@ fun DeveloperModeCard(
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
+                        val isIconSyncSuccess = iconSyncMessage.contains("Successfully") || iconSyncMessage.contains("成功")
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.extraSmall,
                             colors = CardDefaults.cardColors(
-                                containerColor = if (iconSyncMessage.contains("Successfully"))
+                                containerColor = if (isIconSyncSuccess)
                                     MaterialTheme.colorScheme.primaryContainer
                                 else MaterialTheme.colorScheme.errorContainer
                             )
@@ -208,7 +193,7 @@ fun DeveloperModeCard(
                                     text = iconSyncMessage,
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (iconSyncMessage.contains("Successfully"))
+                                    color = if (isIconSyncSuccess)
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     else MaterialTheme.colorScheme.onErrorContainer
                                 )
@@ -216,7 +201,7 @@ fun DeveloperModeCard(
                                     HapticUtil.performClick(haptics)
                                     onClearIconSyncMessage()
                                 }) {
-                                    Text("Dismiss", style = MaterialTheme.typography.labelMedium)
+                                    Text(stringResource(R.string.action_dismiss), style = MaterialTheme.typography.labelMedium)
                                 }
                             }
                         }
@@ -224,7 +209,7 @@ fun DeveloperModeCard(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "Crash Reporting",
+                        stringResource(R.string.dev_section_crash_reporting),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -236,7 +221,7 @@ fun DeveloperModeCard(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Simulate Crash")
+                        Text(stringResource(R.string.dev_simulate_crash))
                     }
                 }
             }

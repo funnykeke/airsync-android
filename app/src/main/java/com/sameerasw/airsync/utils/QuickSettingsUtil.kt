@@ -62,13 +62,13 @@ object QuickSettingsUtil {
             ) { result ->
                 when (result) {
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> {
-                        Toast.makeText(context, "$label tile added", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.qs_tile_added, label), Toast.LENGTH_SHORT).show()
                     }
 
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> {
                         Toast.makeText(
                             context,
-                            "Tile is already in Quick Settings",
+                            context.getString(R.string.qs_tile_already_added),
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -78,10 +78,9 @@ object QuickSettingsUtil {
                 }
             }
         } else {
-            // Fallback instruction for older Android versions
             Toast.makeText(
                 context,
-                "Open Quick Settings, tap the edit button, and drag '$label' into the active tiles.",
+                context.getString(R.string.qs_tile_manual_hint, label),
                 Toast.LENGTH_LONG
             ).show()
         }

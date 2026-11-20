@@ -1,6 +1,8 @@
 @file:Suppress("DEPRECATION")
 package com.sameerasw.airsync.presentation.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.sameerasw.airsync.R
 import android.content.ClipDescription
 import android.util.Log
 import android.view.DragEvent
@@ -183,7 +185,7 @@ fun ClipboardScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = "Drop to send",
+                            contentDescription = stringResource(R.string.ui_drop_to_send),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(16.dp),
@@ -193,7 +195,7 @@ fun ClipboardScreen(
 
                     // Text feedback
                     Text(
-                        text = "Drop to send",
+                        text = stringResource(R.string.ui_drop_to_send),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onBackground
                     )
@@ -230,7 +232,7 @@ fun ClipboardScreen(
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Text(
-                                    text = "Nothing shared yet",
+                                    text = stringResource(R.string.ui_nothing_shared_yet),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -249,7 +251,7 @@ fun ClipboardScreen(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "History",
+                                                text = stringResource(R.string.ui_history),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
@@ -266,7 +268,10 @@ fun ClipboardScreen(
                                 }
 
                                 Text(
-                                    text = if (isHistoryEnabled) "Clipboard will clear after the session" else "Clipboard won't be stored",
+                                    text = stringResource(
+                                        if (isHistoryEnabled) R.string.clipboard_clear_after_session
+                                        else R.string.clipboard_not_stored
+                                    ),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -323,7 +328,7 @@ fun ClipboardScreen(
                             .heightIn(min = 18.dp, max = 100.dp),
                         placeholder = {
                             Text(
-                                text = "Type a message or drag text here...",
+                                text = stringResource(R.string.ui_type_a_message_or_drag_text_here),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
@@ -353,7 +358,7 @@ fun ClipboardScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.Send,
-                            contentDescription = "Send",
+                            contentDescription = stringResource(R.string.ui_send),
                             tint = if (inputText.isNotBlank()) {
                                 MaterialTheme.colorScheme.primary
                             } else {

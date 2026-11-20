@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.dialogs
 
+import com.sameerasw.airsync.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -44,18 +46,18 @@ fun ConnectionDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Connect to Desktop?",
+                    text = stringResource(R.string.ui_connect_to_desktop),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
 
-                Text("Device: $deviceName")
-                Text("Local IP: $localIp")
+                Text(stringResource(R.string.label_device_fmt, deviceName))
+                Text(stringResource(R.string.label_local_ip, localIp))
 
                 HorizontalDivider()
 
-                Text("Connect to Desktop:")
-                Text("IP Address: $desktopIp")
-                Text("Port: $port")
+                Text(stringResource(R.string.label_connect_to_desktop))
+                Text(stringResource(R.string.label_ip_fmt, desktopIp))
+                Text(stringResource(R.string.label_port_fmt, port.toIntOrNull() ?: 6996))
 
                 pcName?.let {
                     Row(
@@ -63,23 +65,7 @@ fun ConnectionDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("PC Name: $it")
-                    }
-                    // Display Plus status badge in dialog
-                    if (isPlus) {
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            ),
-                            modifier = Modifier.padding(start = 8.dp)
-                        ) {
-                            Text(
-                                text = "PLUS",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        Text(stringResource(R.string.label_pc_name_fmt, it))
                     }
                 }
 
@@ -91,14 +77,14 @@ fun ConnectionDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.action_cancel))
                     }
 
                     Button(
                         onClick = onConnect,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Connect")
+                        Text(stringResource(R.string.action_connect))
                     }
                 }
             }

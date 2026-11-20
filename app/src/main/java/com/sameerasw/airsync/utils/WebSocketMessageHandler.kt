@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.utils
 
+import com.sameerasw.airsync.R
 import FileBrowserUtil
 import android.content.Context
 import android.content.Intent
@@ -59,10 +60,11 @@ object WebSocketMessageHandler {
      * @param message Raw JSON message string.
      */
     fun handleIncomingMessage(context: Context, json: String) {
-        Log.d(TAG, "Received WebSocket message: $json")
+        Log.d(TAG, "Received business message")
         try {
             val jsonObject = JSONObject(json)
             val type = jsonObject.optString("type")
+            if (!TransportCapabilities.allows(WebSocketUtil.status.value.mode, type)) return
             Log.d(TAG, "Processing message type: $type")
             val data = jsonObject.optJSONObject("data") ?: JSONObject()
 
@@ -80,6 +82,11 @@ object WebSocketMessageHandler {
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
                 "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
                 "macVolume" -> handleMacVolume(data)
+                "macMediaControlResponse" -> if (!data.optBoolean("success")) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        Toast.makeText(context, data.optString("error", "Mac 无法执行此操作，请检查输出设备及权限"), Toast.LENGTH_LONG).show()
+                    }
+                }
                 "modifierStatus" -> handleModifierStatus(data)
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
@@ -87,7 +94,7 @@ object WebSocketMessageHandler {
                 "refreshAdbPorts" -> handleRefreshAdbPorts(context)
                 "browseLs" -> handleBrowseLs(context, data)
                 "startQuickShare" -> handleStartQuickShare(context)
-                "callControl" -> handleCallControl(context, data)
+                "filePull", "fileTransferInit", "fileChunk", "fileChunkAck", "fileTransferComplete", "fileTransferCancel", "transferVerified" -> LocalFileTransfer.handle(context, type, data)
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -112,14 +119,14 @@ object WebSocketMessageHandler {
 
             val text = data.optString("text")
             if (!text.isNullOrEmpty()) {
-                Log.d(TAG, "Clipboard update received from desktop: ${text.take(50)}...")
+                Log.d(TAG, "Clipboard update received from desktop")
 
                 // Notify ViewModel/UI to add entry to clipboard history
                 onClipboardEntryReceived?.invoke(text)
 
                 // Update system clipboard
                 ClipboardSyncManager.handleClipboardUpdate(context, text)
-                Log.d(TAG, "Clipboard updated from desktop: ${text.take(50)}...")
+                Log.d(TAG, "Clipboard updated from desktop")
             } else {
                 Log.w(TAG, "Clipboard update received but text is empty")
             }
@@ -314,27 +321,6 @@ object WebSocketMessageHandler {
         }
     }
 
-    /**
-     * Handles call control actions (accept, end, decline) from the Mac.
-     */
-    private fun handleCallControl(context: Context, data: JSONObject?) {
-        try {
-            if (data == null) {
-                Log.e(TAG, "Call control data is null")
-                return
-            }
-
-            val action = data.optString("action")
-            Log.d(TAG, "Handling call control action: $action")
-            when (action) {
-                "accept" -> CallControlUtil.acceptCall(context)
-                "end", "decline" -> CallControlUtil.endCall(context)
-                else -> Log.w(TAG, "Unknown call control action: $action")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling call control command: ${e.message}")
-        }
-    }
 
     /**
      * Attempts to dismiss a notification on the Android device by ID.
@@ -548,7 +534,7 @@ object WebSocketMessageHandler {
                 }
 
                 val macName = data.optString("name", "")
-                val isPlus = data.optBoolean("isPlusSubscription", false)
+                val isPlus = true
                 val macVersion = data.optString("version", "3.0.0")
 
                 Log.d(
@@ -563,7 +549,7 @@ object WebSocketMessageHandler {
                         launch(Dispatchers.Main) {
                             Toast.makeText(
                                 context,
-                                "Mac app is outdated ($macVersion < $minVersion). Please update the mac app and reconnect.",
+                                context.getString(R.string.mac_app_outdated, macVersion, minVersion),
                                 Toast.LENGTH_LONG
                             ).show()
                         }
@@ -582,7 +568,12 @@ object WebSocketMessageHandler {
                 // Update last connected device info with Mac name and Plus flag
                 try {
                     val ds = DataStoreManager(context)
-                    val last = ds.getLastConnectedDevice().first()
+val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.model.ConnectedDevice(
+    name = macName.ifBlank { "Mac" }, ipAddress = WebSocketUtil.currentIpAddress ?: "",
+    port = "6996", lastConnected = System.currentTimeMillis(), isPlus = true,
+    symmetricKey = if (WebSocketUtil.isRelayMode()) ds.getRelaySymmetricKey().first() else null
+)
+
                     if (last != null) {
                         // Extract model and device type from macInfo
                         val model = data.optString("model", "").ifBlank { null }
@@ -618,7 +609,7 @@ object WebSocketMessageHandler {
                             val port = last.port
                             val symmetricKey = last.symmetricKey
 
-                            if (clientIp.isNotBlank() && ourIp.isNotBlank()) {
+                            if (!WebSocketUtil.isRelayMode() && clientIp.isNotBlank() && ourIp.isNotBlank()) {
                                 ds.saveNetworkDeviceConnection(
                                     deviceName = if (macName.isNotBlank()) macName else last.name,
                                     ourIp = ourIp,
@@ -789,7 +780,7 @@ object WebSocketMessageHandler {
                         packageName = packageName,
                         success = true,
                         newState = newState,
-                        message = "App notification state updated successfully"
+                        message = context.getString(R.string.ui_app_notification_state_updated_successfully)
                     )
                     WebSocketUtil.sendMessage(responseMessage)
                 } else {
@@ -800,7 +791,7 @@ object WebSocketMessageHandler {
                         packageName = packageName,
                         success = false,
                         newState = newState,
-                        message = "App not found"
+                        message = context.getString(R.string.ui_app_not_found)
                     )
                     WebSocketUtil.sendMessage(responseMessage)
                 }

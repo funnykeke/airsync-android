@@ -40,11 +40,10 @@ object ShortcutUtil {
         }
 
         if (isPaused) {
-            // When paused: Replace scan and reconnect shortcuts with Resume
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_RESUME)
-                    .setShortLabel("Resume")
-                    .setLongLabel("Resume AirSync")
+                    .setShortLabel(context.getString(R.string.resume))
+                    .setLongLabel(context.getString(R.string.shortcut_resume_airsync))
                     .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_play_arrow_24))
                     .setIntent(Intent(context, ClipboardActionActivity::class.java).apply {
                         action = DASH_ACTION_RESUME
@@ -52,11 +51,10 @@ object ShortcutUtil {
                     .build()
             )
         } else if (!isConnected) {
-            // 1. Scan (Only when disconnected)
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_SCAN)
-                    .setShortLabel("Scan")
-                    .setLongLabel("Scan QR Code")
+                    .setShortLabel(context.getString(R.string.shortcut_scan_short))
+                    .setLongLabel(context.getString(R.string.scan_qr_code))
                     .setIcon(
                         IconCompat.createWithResource(
                             context,
@@ -73,11 +71,10 @@ object ShortcutUtil {
                     .build()
             )
 
-            // 2. Reconnect
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_RECONNECT)
-                    .setShortLabel("Reconnect")
-                    .setLongLabel("Reconnect")
+                    .setShortLabel(context.getString(R.string.ui_reconnect))
+                    .setLongLabel(context.getString(R.string.ui_reconnect))
                     .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_devices_24))
                     .setIntent(Intent(context, ClipboardActionActivity::class.java).apply {
                         action = DASH_ACTION_RECONNECT
@@ -85,11 +82,10 @@ object ShortcutUtil {
                     .build()
             )
 
-            // 3. Pause
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_PAUSE)
-                    .setShortLabel("Pause")
-                    .setLongLabel("Pause AirSync")
+                    .setShortLabel(context.getString(R.string.pause))
+                    .setLongLabel(context.getString(R.string.shortcut_pause_airsync))
                     .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_pause_24))
                     .setIntent(Intent(context, ClipboardActionActivity::class.java).apply {
                         action = DASH_ACTION_PAUSE
@@ -99,12 +95,10 @@ object ShortcutUtil {
         } else {
             buildShareMacShortcut(context)?.let { shortcuts.add(it) }
 
-            // 1. Remote (Direct to Remote tab)
-            // Use MainActivity with a specific action
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_REMOTE)
-                    .setShortLabel("Remote")
-                    .setLongLabel("Remote Control")
+                    .setShortLabel(context.getString(R.string.tab_remote))
+                    .setLongLabel(context.getString(R.string.shortcut_remote_control))
                     .setIcon(
                         IconCompat.createWithResource(
                             context,
@@ -122,11 +116,10 @@ object ShortcutUtil {
                     .build()
             )
 
-            // 2. Clipboard
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_CLIPBOARD)
-                    .setShortLabel("Clipboard")
-                    .setLongLabel("Send Clipboard")
+                    .setShortLabel(context.getString(R.string.tab_clipboard))
+                    .setLongLabel(context.getString(R.string.sync_clipboard))
                     .setIcon(IconCompat.createWithResource(context, R.drawable.ic_clipboard_24))
                     .setIntent(Intent(context, ClipboardActionActivity::class.java).apply {
                         action = DASH_ACTION_CLIPBOARD
@@ -134,11 +127,10 @@ object ShortcutUtil {
                     .build()
             )
 
-            // 3. Lock
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_LOCK)
-                    .setShortLabel("Lock")
-                    .setLongLabel("Lock Mac")
+                    .setShortLabel(context.getString(R.string.action_lock_screen))
+                    .setLongLabel(context.getString(R.string.shortcut_lock_mac))
                     .setIcon(IconCompat.createWithResource(context, R.drawable.rounded_lock_24))
                     .setIntent(Intent(context, ClipboardActionActivity::class.java).apply {
                         action = DASH_ACTION_LOCK
@@ -146,11 +138,10 @@ object ShortcutUtil {
                     .build()
             )
 
-            // 4. Disconnect
             shortcuts.add(
                 ShortcutInfoCompat.Builder(context, SHORTCUT_ID_DISCONNECT)
-                    .setShortLabel("Disconnect")
-                    .setLongLabel("Disconnect")
+                    .setShortLabel(context.getString(R.string.disconnect))
+                    .setLongLabel(context.getString(R.string.disconnect))
                     .setIcon(
                         IconCompat.createWithResource(
                             context,

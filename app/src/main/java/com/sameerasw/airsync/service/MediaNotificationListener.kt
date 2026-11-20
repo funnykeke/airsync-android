@@ -10,14 +10,20 @@ import android.media.Rating
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.domain.model.MediaInfo
+import com.sameerasw.airsync.utils.MediaTimeline
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
+import com.sameerasw.airsync.utils.NotificationListenerRecovery
+import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +33,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.util.LinkedList
+import java.util.concurrent.atomic.AtomicLong
 
 class MediaNotificationListener : NotificationListenerService() {
 
@@ -38,13 +45,40 @@ class MediaNotificationListener : NotificationListenerService() {
         private var serviceInstance: MediaNotificationListener? = null
         private const val TAG = "MediaNotificationListener"
 
+        @Volatile
+        private var listenerConnected = false
+        private val listenerRecovery = NotificationListenerRecovery()
+
+        // A permission grant does not imply a live system binding. In particular,
+        // after a process restart there may be no service to receive a disconnect
+        // callback, so recovery must also be driven by the foreground service.
+        fun ensureListenerConnected(context: Context) {
+            val appContext = context.applicationContext
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                Handler(Looper.getMainLooper()).post { ensureListenerConnected(appContext) }
+                return
+            }
+            if (!listenerRecovery.shouldRequestRebind(
+                    PermissionUtil.isNotificationListenerEnabled(appContext),
+                    listenerConnected,
+                    SystemClock.elapsedRealtime()
+                )) return
+            try {
+                Log.i(TAG, "Notification access granted but listener unbound; requesting rebind")
+                requestRebind(ComponentName(appContext, MediaNotificationListener::class.java))
+            } catch (e: Exception) {
+                Log.w(TAG, "Notification listener rebind failed", e)
+            }
+        }
+
         // Flag to pause media listener when receiving playing media from Mac
         @Volatile
         private var isMediaListenerPaused = false
 
         // New: global toggle for now playing reporting
         @Volatile
-        private var isNowPlayingEnabled: Boolean = true
+        private var isNowPlayingEnabled: Boolean = false
+        private val mediaPreferenceRevision = AtomicLong(0)
 
         // Excluded media packages
         @Volatile
@@ -56,6 +90,7 @@ class MediaNotificationListener : NotificationListenerService() {
         }
 
         fun setNowPlayingEnabled(context: Context, enabled: Boolean) {
+            mediaPreferenceRevision.incrementAndGet()
             isNowPlayingEnabled = enabled
             if (!enabled) {
                 // Clear cached media and pause listener
@@ -65,6 +100,9 @@ class MediaNotificationListener : NotificationListenerService() {
             } else {
                 isMediaListenerPaused = false
                 Log.d(TAG, "Now playing enabled: resuming media listener")
+            }
+            Handler(Looper.getMainLooper()).post {
+                serviceInstance?.applyMediaObservationPreference()
             }
             // Trigger a status sync to reflect change
             SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
@@ -80,6 +118,11 @@ class MediaNotificationListener : NotificationListenerService() {
                    old.albumArtLite != new.albumArtLite ||
                    old.durationMs != new.durationMs ||
                    old.isBuffering != new.isBuffering ||
+                   old.playbackRate != new.playbackRate ||
+                   kotlin.math.abs(new.positionMs - MediaTimeline.positionAt(
+                       old.positionMs, old.positionTimestampMs, new.positionTimestampMs,
+                       old.isPlaying && !old.isBuffering, old.playbackRate, new.durationMs
+                   )) > 1_000L ||
                    old.likeStatus != new.likeStatus
         }
 
@@ -103,6 +146,23 @@ class MediaNotificationListener : NotificationListenerService() {
 
         fun getInstance(): MediaNotificationListener? {
             return serviceInstance
+        }
+
+        fun syncActiveNotifications() {
+            Handler(Looper.getMainLooper()).post {
+                val listener = serviceInstance ?: return@post
+                if (!listenerConnected || !WebSocketUtil.isConnected()) return@post
+                try {
+                    // The Mac may have restarted while this process stayed alive.
+                    // Reuse stored IDs so existing Mac cards are updated in place.
+                    synchronized(listener.notificationCache) { listener.notificationCache.clear() }
+                    val active = listener.activeNotifications.orEmpty()
+                    Log.i(TAG, "Resyncing active notification snapshot: ${active.size} entries")
+                    active.forEach { listener.processNotificationForSync(it) }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Unable to resync active notifications", e)
+                }
+            }
         }
 
         fun getMediaInfo(context: Context): MediaInfo {
@@ -142,8 +202,16 @@ class MediaNotificationListener : NotificationListenerService() {
                         val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
                         val durationMs =
                             metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
-                        val positionMs = playbackState?.position ?: 0L
+                        // PlaybackState.position belongs to lastPositionUpdateTime
+                        // (elapsedRealtime), not the wall time when we query it.
+                        val playbackRate = playbackState?.playbackSpeed?.toDouble() ?: 1.0
                         val positionTimestampMs = System.currentTimeMillis()
+                        val positionMs = MediaTimeline.positionAt(
+                            playbackState?.position ?: 0L,
+                            playbackState?.lastPositionUpdateTime ?: 0L,
+                            android.os.SystemClock.elapsedRealtime(),
+                            isPlaying, playbackRate, durationMs
+                        )
                         val isBuffering = when (playbackState?.state) {
                             PlaybackState.STATE_BUFFERING,
                             PlaybackState.STATE_CONNECTING -> true
@@ -165,7 +233,6 @@ class MediaNotificationListener : NotificationListenerService() {
                         val albumArtLiteBase64 = albumArtBitmap?.let {
                             try {
                                 val outputStream = ByteArrayOutputStream()
-                                // Scale down to 80x80 and lower quality for BLE
                                 val scaled = Bitmap.createScaledBitmap(it, 80, 80, true)
                                 scaled.compress(Bitmap.CompressFormat.JPEG, 30, outputStream)
                                 Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
@@ -201,7 +268,8 @@ class MediaNotificationListener : NotificationListenerService() {
                                 positionMs = positionMs,
                                 positionTimestampMs = positionTimestampMs,
                                 isBuffering = isBuffering,
-                                likeStatus = likeStatus
+                                likeStatus = likeStatus,
+                                playbackRate = playbackRate
                             )
                         }
                     }
@@ -426,8 +494,8 @@ class MediaNotificationListener : NotificationListenerService() {
         }
     }
 
-    private val serviceJob = Job()
-    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private var serviceJob = kotlinx.coroutines.SupervisorJob()
+    private var serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private lateinit var dataStoreManager: DataStoreManager
 
     // Cache to store last 5 notifications
@@ -440,12 +508,17 @@ class MediaNotificationListener : NotificationListenerService() {
         serviceInstance = this
 
         // Load the persisted now playing setting
+        val initialRevision = mediaPreferenceRevision.get()
         serviceScope.launch {
             try {
                 val enabled = dataStoreManager.getSendNowPlayingEnabled().first()
-                isNowPlayingEnabled = enabled
-                if (!enabled) {
-                    isMediaListenerPaused = true
+                Handler(Looper.getMainLooper()).post {
+                    // A setting change while the read was in flight wins.
+                    if (serviceInstance !== this@MediaNotificationListener ||
+                        !serviceJob.isActive || mediaPreferenceRevision.get() != initialRevision) return@post
+                    isNowPlayingEnabled = enabled
+                    isMediaListenerPaused = !enabled
+                    applyMediaObservationPreference()
                 }
                 Log.d(TAG, "Initialized now playing setting: $enabled")
             } catch (_: Exception) {
@@ -455,10 +528,16 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        if (!serviceJob.isActive) {
+            serviceJob = kotlinx.coroutines.SupervisorJob()
+            serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+        }
+        serviceInstance = this
+        listenerConnected = true
         Log.d(TAG, "Notification listener connected - Ready to sync notifications")
         // Start AirSyncService scanning when listener connects (effectively on boot)
         try {
-            AirSyncService.startScanning(applicationContext)
+            if (!AirSyncService.isRunning()) AirSyncService.startScanning(applicationContext)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start AirSyncService from listener", e)
         }
@@ -489,15 +568,90 @@ class MediaNotificationListener : NotificationListenerService() {
             Log.e(TAG, "Failed to restore active notifications on listener connect", e)
         }
 
-        updateMediaInfo()
+        applyMediaObservationPreference()
+        syncActiveNotifications()
+    }
+
+    private var observedSessionManager: MediaSessionManager? = null
+    private val observedControllers = mutableListOf<Pair<MediaController, MediaController.Callback>>()
+    private val activeSessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+        observeMediaSessions(controllers)
+        syncMediaSessionChange()
+    }
+
+    private fun observeMediaSessions(controllers: List<MediaController>?) {
+        observedControllers.forEach { (controller, callback) -> controller.unregisterCallback(callback) }
+        observedControllers.clear()
+        if (!isNowPlayingEnabled || !listenerConnected) return
+        controllers.orEmpty().filter { it.packageName != packageName }.forEach { controller ->
+            val callback = object : MediaController.Callback() {
+                override fun onPlaybackStateChanged(state: PlaybackState?) = syncMediaSessionChange()
+                override fun onMetadataChanged(metadata: MediaMetadata?) = syncMediaSessionChange()
+            }
+            controller.registerCallback(callback, android.os.Handler(mainLooper))
+            observedControllers.add(controller to callback)
+        }
+    }
+
+    private fun syncMediaSessionChange() {
+        if (!WebSocketUtil.isConnected() || isMediaListenerPaused || !isNowPlayingEnabled) return
+        val previous = currentMediaInfo
+        currentMediaInfo = getMediaInfo(this)
+        if (hasSignificantMediaChange(previous, currentMediaInfo)) {
+            // A real session callback is authoritative, including small seeks;
+            // do not filter it through the periodic sync's five-second threshold.
+            SyncManager.checkAndSyncDeviceStatus(this, forceSync = true)
+        }
+    }
+
+    private fun startMediaSessionObservation() {
+        stopMediaSessionObservation()
+        if (!isNowPlayingEnabled || !listenerConnected) return
+        try {
+            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val component = ComponentName(this, MediaNotificationListener::class.java)
+            manager.addOnActiveSessionsChangedListener(activeSessionsListener, component, android.os.Handler(mainLooper))
+            observedSessionManager = manager
+            observeMediaSessions(manager.getActiveSessions(component))
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Media session observation unavailable: ${e.message}")
+        }
+    }
+
+    private fun stopMediaSessionObservation() {
+        observedSessionManager?.removeOnActiveSessionsChangedListener(activeSessionsListener)
+        observedSessionManager = null
+        observeMediaSessions(emptyList())
+    }
+
+    private fun applyMediaObservationPreference() {
+        if (!isNowPlayingEnabled || !listenerConnected) {
+            stopMediaSessionObservation()
+            currentMediaInfo = null
+            return
+        }
+        if (observedSessionManager == null) startMediaSessionObservation()
+        if (!isMediaListenerPaused) syncMediaSessionChange()
     }
 
     override fun onListenerDisconnected() {
+        listenerConnected = false
+        stopMediaSessionObservation()
         super.onListenerDisconnected()
         Log.d(TAG, "Notification listener disconnected")
 
         serviceJob.cancel()
-        WebSocketUtil.cleanup()
+        ensureListenerConnected(this)
+    }
+
+    override fun onDestroy() {
+        stopMediaSessionObservation()
+        serviceJob.cancel()
+        if (serviceInstance === this) {
+            listenerConnected = false
+            serviceInstance = null
+        }
+        super.onDestroy()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -508,9 +662,7 @@ class MediaNotificationListener : NotificationListenerService() {
         sbn?.let { notification ->
             Log.d(
                 TAG,
-                "Notification posted: ${notification.packageName} - ${
-                    notification.notification?.extras?.getString(Notification.EXTRA_TITLE)
-                }"
+                "Notification posted: ${notification.packageName}"
             )
 
             // Skip media processing if media listener is paused or globally disabled
@@ -542,27 +694,6 @@ class MediaNotificationListener : NotificationListenerService() {
             return
         }
         if (sbn != null) handleNotificationRemoval(sbn)
-    }
-
-    // API level variants call the same handler to ensure we catch swipe-away removals
-    override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap) {
-        super.onNotificationRemoved(sbn, rankingMap)
-        if (!WebSocketUtil.isConnected()) {
-            return
-        }
-        handleNotificationRemoval(sbn)
-    }
-
-    override fun onNotificationRemoved(
-        sbn: StatusBarNotification,
-        rankingMap: RankingMap,
-        reason: Int
-    ) {
-        super.onNotificationRemoved(sbn, rankingMap, reason)
-        if (!WebSocketUtil.isConnected()) {
-            return
-        }
-        handleNotificationRemoval(sbn)
     }
 
     private fun handleNotificationRemoval(sbn: StatusBarNotification) {
@@ -647,9 +778,9 @@ class MediaNotificationListener : NotificationListenerService() {
                 val notificationApps = dataStoreManager.getNotificationApps().first()
                 val appSettings = notificationApps.find { it.packageName == sbn.packageName }
 
-                // If app settings exist and it's disabled, skip
-                if (appSettings != null && !appSettings.isEnabled) {
-                    Log.d(TAG, "App ${sbn.packageName} is disabled for notifications, skipping")
+                // A missing preference is not consent to synchronize an app.
+                if (appSettings?.isEnabled != true) {
+                    Log.d(TAG, "App ${sbn.packageName} is not enabled for notifications, skipping")
                     return@launch
                 }
 
@@ -676,18 +807,12 @@ class MediaNotificationListener : NotificationListenerService() {
                 if (title.isNotEmpty() || body.isNotEmpty()) {
                     Log.d(
                         TAG,
-                        "Syncing notification - App: $appName, Package: ${sbn.packageName}, Title: $title, Body: $body"
+                        "Syncing notification: ${sbn.packageName}"
                     )
-
-                    // Save the app to our list if it's new (auto-enable new apps)
-                    if (appSettings == null) {
-                        Log.d(TAG, "New app detected: ${sbn.packageName}, adding to preferences")
-                        saveNewAppToPreferences(sbn.packageName, appName)
-                    }
 
                     // Check for duplicate notifications
                     if (isDuplicateNotification(sbn.packageName, body)) {
-                        Log.d(TAG, "Duplicate notification detected, skipping sync: $title")
+                        Log.d(TAG, "Duplicate notification detected, skipping sync: ${sbn.packageName}")
                         return@launch
                     }
 
@@ -768,9 +893,7 @@ class MediaNotificationListener : NotificationListenerService() {
                         )
                     )
 
-                    Log.d(TAG, "Preparing to send notification: $notificationJson")
-
-                    Log.d(TAG, "Sending notification via WS/BLE")
+                    Log.d(TAG, "Sending notification via WebSocket")
                     val success = WebSocketUtil.sendMessage(notificationJson)
                     if (success) {
                         Log.d(
@@ -846,28 +969,4 @@ class MediaNotificationListener : NotificationListenerService() {
         }
     }
 
-    private suspend fun saveNewAppToPreferences(packageName: String, appName: String) {
-        try {
-            val currentApps = dataStoreManager.getNotificationApps().first().toMutableList()
-            val isSystemApp = try {
-                val applicationInfo = packageManager.getApplicationInfo(packageName, 0)
-                (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
-            } catch (e: Exception) {
-                false
-            }
-
-            val newApp = com.sameerasw.airsync.domain.model.NotificationApp(
-                packageName = packageName,
-                appName = appName,
-                isEnabled = true,
-                isSystemApp = isSystemApp,
-                lastUpdated = System.currentTimeMillis()
-            )
-
-            currentApps.add(newApp)
-            dataStoreManager.saveNotificationApps(currentApps)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error saving new app to preferences", e)
-        }
-    }
 }

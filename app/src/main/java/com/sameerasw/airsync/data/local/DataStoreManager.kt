@@ -25,7 +25,6 @@ class DataStoreManager(private val context: Context) {
         private val IP_ADDRESS = stringPreferencesKey("ip_address")
         private val PORT = stringPreferencesKey("port")
         private val DEVICE_NAME = stringPreferencesKey("device_name")
-        private val FIRST_RUN = booleanPreferencesKey("first_run")
         private val PERMISSIONS_CHECKED = booleanPreferencesKey("permissions_checked")
         private val LAST_CONNECTED_PC_NAME = stringPreferencesKey("last_connected_pc_name")
         private val LAST_CONNECTED_PC_IP = stringPreferencesKey("last_connected_pc_ip")
@@ -38,10 +37,6 @@ class DataStoreManager(private val context: Context) {
         private val LAST_CONNECTED_DEVICE_TYPE = stringPreferencesKey("last_connected_device_type")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
 
-        // Essentials island provider
-        private val ISLAND_SHOW_BATTERY = booleanPreferencesKey("island_show_battery")
-        private val ISLAND_SHOW_WHEN_DISCONNECTED = booleanPreferencesKey("island_show_when_disconnected")
-
         // Widget-visible Mac status keys
         private val MAC_BATTERY_LEVEL = intPreferencesKey("mac_battery_level")
         private val MAC_BATTERY_CHARGING = booleanPreferencesKey("mac_battery_charging")
@@ -52,6 +47,7 @@ class DataStoreManager(private val context: Context) {
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         private val DEVELOPER_MODE_VISIBLE = booleanPreferencesKey("developer_mode_visible")
         private val CLIPBOARD_SYNC_ENABLED = booleanPreferencesKey("clipboard_sync_enabled")
+        private val ROOT_CLIPBOARD_ENABLED = booleanPreferencesKey("root_clipboard_enabled")
         private val CLIPBOARD_HISTORY_ENABLED = booleanPreferencesKey("clipboard_history_enabled")
         private val ICON_SYNC_COUNT = stringPreferencesKey("icon_sync_count")
         private val LAST_ICON_SYNC_DATE = stringPreferencesKey("last_icon_sync_date")
@@ -73,29 +69,14 @@ class DataStoreManager(private val context: Context) {
         // Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
 
-        // Always show in Smartspacer toggle
-        private val SMARTSPACER_SHOW_WHEN_DISCONNECTED =
-            booleanPreferencesKey("smartspacer_show_when_disconnected")
         private val EXPAND_NETWORKING_ENABLED = booleanPreferencesKey("expand_networking_enabled")
 
-        // Mac Media controls toggle (for user-initiated proof for Play Store)
+        // Mac Media controls toggle
         private val MAC_MEDIA_CONTROLS_ENABLED = booleanPreferencesKey("mac_media_controls_enabled")
 
-        // Essentials Bridge
-        private val ESSENTIALS_CONNECTION_ENABLED =
-            booleanPreferencesKey("essentials_connection_enabled")
-
         private val DEFAULT_TAB = stringPreferencesKey("default_tab")
-        private val FIRST_MAC_CONNECTION_TIME = longPreferencesKey("first_mac_connection_time")
-        private val LAST_PROMPT_DISMISSED_VERSION =
-            intPreferencesKey("last_prompt_dismissed_version")
-        private val HAS_RATED_APP = booleanPreferencesKey("has_rated_app")
 
-
-        // Call monitoring preferences
-        private val CALL_SYNC_ENABLED = booleanPreferencesKey("call_sync_enabled")
         private val DEVICE_DISCOVERY_ENABLED = booleanPreferencesKey("device_discovery_enabled")
-        private val LAST_CALL_SYNC_TIMESTAMP = longPreferencesKey("last_call_sync_timestamp")
         private val DEVICE_ID = stringPreferencesKey("device_id")
         private val USE_BLUR = booleanPreferencesKey("use_blur")
         private val USE_RIPPLE = booleanPreferencesKey("use_ripple")
@@ -109,8 +90,13 @@ class DataStoreManager(private val context: Context) {
 
         private val REMOTE_FLIPPED = booleanPreferencesKey("remote_flipped")
 
-        private val BLE_SYNC_ENABLED = booleanPreferencesKey("ble_sync_enabled")
-        private val BLE_AUTO_CONNECT_ENABLED = booleanPreferencesKey("ble_auto_connect_enabled")
+        // 中转模式配置
+        private val TRANSPORT_MODE = stringPreferencesKey("transport_mode")
+        private val RELAY_SERVER_URL = stringPreferencesKey("relay_server_url")
+        private val RELAY_ROOM = stringPreferencesKey("relay_room")
+        private val RELAY_SYMMETRIC_KEY = stringPreferencesKey("relay_symmetric_key")
+        private val RELAY_SECRET = stringPreferencesKey("relay_secret")
+        private val RELAY_PINNED_CERT_SHA256 = stringPreferencesKey("relay_pinned_cert_sha256")
         private val NOTIFY_ON_CRASH = booleanPreferencesKey("notify_on_crash")
 
         private const val NETWORK_DEVICES_PREFIX = "network_device_"
@@ -161,17 +147,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun setFirstRun(isFirstRun: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[FIRST_RUN] = isFirstRun
-        }
-    }
 
-    fun getFirstRun(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            preferences[FIRST_RUN] != false
-        }
-    }
 
     suspend fun setPermissionsChecked(checked: Boolean) {
         context.dataStore.edit { preferences ->
@@ -207,6 +183,14 @@ class DataStoreManager(private val context: Context) {
         return context.dataStore.data.map { preferences ->
             preferences[CLIPBOARD_SYNC_ENABLED] != false // Default to enabled
         }
+    }
+
+    fun getRootClipboardEnabled(): Flow<Boolean> = context.dataStore.data.map {
+        it[ROOT_CLIPBOARD_ENABLED] == true
+    }
+
+    suspend fun setRootClipboardEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[ROOT_CLIPBOARD_ENABLED] = enabled }
     }
 
     suspend fun setClipboardHistoryEnabled(enabled: Boolean) {
@@ -287,18 +271,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // Always show in Smartspacer toggle
-    suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] = enabled
-        }
-    }
 
-    fun getSmartspacerShowWhenDisconnected(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            preferences[SMARTSPACER_SHOW_WHEN_DISCONNECTED] ?: false
-        }
-    }
 
     suspend fun setExpandNetworkingEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
@@ -386,42 +359,18 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun setFirstMacConnectionTime(time: Long) {
-        context.dataStore.edit { prefs ->
-            if (prefs[FIRST_MAC_CONNECTION_TIME] == null) {
-                prefs[FIRST_MAC_CONNECTION_TIME] = time
-            }
-        }
-    }
 
-    fun getFirstMacConnectionTime(): Flow<Long> {
-        return context.dataStore.data.map { prefs ->
-            prefs[FIRST_MAC_CONNECTION_TIME] ?: 0L
-        }
-    }
 
-    suspend fun setLastPromptDismissedVersion(version: Int) {
-        context.dataStore.edit { prefs ->
-            prefs[LAST_PROMPT_DISMISSED_VERSION] = version
-        }
-    }
 
-    fun getLastPromptDismissedVersion(): Flow<Int> {
-        return context.dataStore.data.map { prefs ->
-            prefs[LAST_PROMPT_DISMISSED_VERSION] ?: -1
-        }
-    }
 
-    suspend fun setHasRatedApp(hasRated: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[HAS_RATED_APP] = hasRated
-        }
-    }
 
-    fun hasRatedApp(): Flow<Boolean> {
-        return context.dataStore.data.map { prefs ->
-            prefs[HAS_RATED_APP] ?: false
-        }
+
+    /** 单独保存加密密钥（relay 模式无法扫码，需从 Mac 端复制） */
+fun getRelaySymmetricKey(): Flow<String?> = context.dataStore.data.map { it[RELAY_SYMMETRIC_KEY] ?: it[LAST_CONNECTED_SYMMETRIC_KEY] }
+suspend fun setRelaySymmetricKey(key: String) { context.dataStore.edit { it[RELAY_SYMMETRIC_KEY] = key.trim() } }
+
+    suspend fun setLastConnectedSymmetricKey(key: String) {
+        context.dataStore.edit { it[LAST_CONNECTED_SYMMETRIC_KEY] = key }
     }
 
     suspend fun saveLastConnectedDevice(device: ConnectedDevice) {
@@ -1018,17 +967,7 @@ class DataStoreManager(private val context: Context) {
     }
 
     // Call sync methods
-    suspend fun setCallSyncEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[CALL_SYNC_ENABLED] = enabled
-        }
-    }
 
-    fun getCallSyncEnabled(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            preferences[CALL_SYNC_ENABLED] ?: false // Default to disabled
-        }
-    }
 
     suspend fun setDeviceDiscoveryEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
@@ -1042,17 +981,7 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun setLastCallSyncTimestamp(timestamp: Long) {
-        context.dataStore.edit { preferences ->
-            preferences[LAST_CALL_SYNC_TIMESTAMP] = timestamp
-        }
-    }
 
-    fun getLastCallSyncTimestamp(): Flow<Long> {
-        return context.dataStore.data.map { preferences ->
-            preferences[LAST_CALL_SYNC_TIMESTAMP] ?: 0L
-        }
-    }
 
     suspend fun setDeviceId(deviceId: String) {
         context.dataStore.edit { preferences ->
@@ -1066,31 +995,46 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun setEssentialsConnectionEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[ESSENTIALS_CONNECTION_ENABLED] = enabled
-        }
+    // ===== 中转模式 =====
+
+    suspend fun setTransportMode(mode: String) {
+        context.dataStore.edit { it[TRANSPORT_MODE] = mode }
     }
 
-    fun getEssentialsConnectionEnabled(): Flow<Boolean> {
-        return context.dataStore.data.map { prefs ->
-            prefs[ESSENTIALS_CONNECTION_ENABLED] ?: false
-        }
+    fun getTransportMode(): Flow<String> =
+        context.dataStore.data.map { it[TRANSPORT_MODE] ?: "local" }
+
+    suspend fun setRelayServerUrl(url: String) {
+        context.dataStore.edit { it[RELAY_SERVER_URL] = url }
     }
 
-    suspend fun setBleSyncEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[BLE_SYNC_ENABLED] = enabled }
+    fun getRelayServerUrl(): Flow<String> =
+        context.dataStore.data.map { it[RELAY_SERVER_URL] ?: "" }
+
+    suspend fun setRelayRoom(room: String) {
+        context.dataStore.edit { it[RELAY_ROOM] = room }
     }
 
-    fun getBleSyncEnabled(): Flow<Boolean> =
-        context.dataStore.data.map { it[BLE_SYNC_ENABLED] ?: false }
+    fun getRelayRoom(): Flow<String> =
+        context.dataStore.data.map { it[RELAY_ROOM] ?: "" }
 
-    suspend fun setBleAutoConnectEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[BLE_AUTO_CONNECT_ENABLED] = enabled }
+    suspend fun setRelaySecret(secret: String) {
+        context.dataStore.edit { it[RELAY_SECRET] = secret }
     }
 
-    fun getBleAutoConnectEnabled(): Flow<Boolean> =
-        context.dataStore.data.map { it[BLE_AUTO_CONNECT_ENABLED] ?: true }
+    fun getRelaySecret(): Flow<String> =
+        context.dataStore.data.map { it[RELAY_SECRET] ?: "" }
+
+    suspend fun setRelayPinnedCertSha256(sha256: String) {
+        context.dataStore.edit { it[RELAY_PINNED_CERT_SHA256] = sha256 }
+    }
+
+    fun getRelayPinnedCertSha256(): Flow<String> =
+        context.dataStore.data.map { it[RELAY_PINNED_CERT_SHA256] ?: "" }
+
+
+
+
 
     suspend fun setUseRippleEnabled(enabled: Boolean) {
         context.dataStore.edit { it[USE_RIPPLE] = enabled }
@@ -1098,18 +1042,4 @@ class DataStoreManager(private val context: Context) {
 
     fun getUseRippleEnabled(): Flow<Boolean> =
         context.dataStore.data.map { it[USE_RIPPLE] ?: true }
-
-    fun getIslandShowWhenDisconnected(): Flow<Boolean> =
-        context.dataStore.data.map { it[ISLAND_SHOW_WHEN_DISCONNECTED] ?: true }
-
-    suspend fun setIslandShowWhenDisconnected(enabled: Boolean) {
-        context.dataStore.edit { it[ISLAND_SHOW_WHEN_DISCONNECTED] = enabled }
-    }
-
-    fun getIslandShowBattery(): Flow<Boolean> =
-        context.dataStore.data.map { it[ISLAND_SHOW_BATTERY] ?: true }
-
-    suspend fun setIslandShowBattery(enabled: Boolean) {
-        context.dataStore.edit { it[ISLAND_SHOW_BATTERY] = enabled }
-    }
 }

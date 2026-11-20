@@ -206,36 +206,18 @@ object PermissionUtil {
         }
 
         // Check call log permission (optional)
-        if (!isCallLogPermissionGranted(context)) {
-            missing.add("Call Log Access")
-        }
 
         // Check contacts permission (optional)
-        if (!isContactsPermissionGranted(context)) {
-            missing.add("Contacts Access")
-        }
 
         // Check phone state permission (optional)
-        if (!isPhoneStatePermissionGranted(context)) {
-            missing.add("Phone Access")
-        }
 
-        if (!isBluetoothPermissionsGranted(context)) {
-            missing.add("Bluetooth Access")
-        }
 
         if (Build.VERSION.SDK_INT >= 37 && !isLocalNetworkPermissionGranted(context)) {
             missing.add("Local Network Access")
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(
-                context
-            )
-        ) {
-            missing.add("Answer Calls")
-        }
 
-        if (!isClipboardAccessibilityEnabled(context)) {
+        if (!isClipboardAccessibilityEnabled(context) && !ClipboardSyncManager.isRootSelected) {
             missing.add("Background Clipboard Sync")
         }
 
@@ -278,102 +260,26 @@ object PermissionUtil {
         }
 
         // Call log access is optional for call log sync
-        if (!isCallLogPermissionGranted(context)) {
-            optional.add("Call Log Access")
-        }
 
         // Contacts access is optional for contacts sync
-        if (!isContactsPermissionGranted(context)) {
-            optional.add("Contacts Access")
-        }
 
         // Phone state access is optional
-        if (!isPhoneStatePermissionGranted(context)) {
-            optional.add("Phone Access")
-        }
 
-        if (!isBluetoothPermissionsGranted(context)) {
-            optional.add("Bluetooth Access")
-        }
 
         if (Build.VERSION.SDK_INT >= 37 && !isLocalNetworkPermissionGranted(context)) {
             optional.add("Local Network Access")
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !isAnswerCallsPermissionGranted(
-                context
-            )
-        ) {
-            optional.add("Answer Calls")
-        }
 
-        if (!isClipboardAccessibilityEnabled(context)) {
+        if (!isClipboardAccessibilityEnabled(context) && !ClipboardSyncManager.isRootSelected) {
             optional.add("Background Clipboard Sync")
         }
 
         return optional
     }
 
-    /**
-     * Check if READ_CALL_LOG permission is granted
-     */
-    fun isCallLogPermissionGranted(context: Context): Boolean {
-        return ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_CALL_LOG
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
-    /**
-     * Check if READ_CONTACTS permission is granted
-     */
-    fun isContactsPermissionGranted(context: Context): Boolean {
-        return ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_CONTACTS
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
-    /**
-     * Check if READ_PHONE_STATE permission is granted
-     */
-    fun isPhoneStatePermissionGranted(context: Context): Boolean {
-        return ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_PHONE_STATE
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
-    /**
-     * Check if Bluetooth permissions are granted (Connect and Advertise/Scan on Android 12+)
-     */
-    fun isBluetoothPermissionsGranted(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.BLUETOOTH_ADVERTISE
-                    ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            // On older versions, manifest permissions are enough
-            true
-        }
-    }
 
-    /**
-     * Check if ANSWER_PHONE_CALLS permission is granted
-     */
-    fun isAnswerCallsPermissionGranted(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ANSWER_PHONE_CALLS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
 }

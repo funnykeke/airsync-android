@@ -55,7 +55,7 @@ fun LastConnectedDeviceCard(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                "Last Connected Device",
+                "上次连接的设备",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -68,7 +68,7 @@ fun LastConnectedDeviceCard(
                 val previewRes = DevicePreviewResolver.getPreviewRes(device)
                 Image(
                     painter = painterResource(id = previewRes),
-                    contentDescription = "Connected Mac preview",
+                    contentDescription = stringResource(R.string.ui_connected_mac_preview),
                     modifier = Modifier.fillMaxWidth(0.45f),
                     contentScale = ContentScale.Fit,
                     colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
@@ -91,37 +91,19 @@ fun LastConnectedDeviceCard(
                         val currentTime = System.currentTimeMillis()
                         val diffMinutes = (currentTime - device.lastConnected) / (1000 * 60)
                         when {
-                            diffMinutes < 1 -> "Just now"
-                            diffMinutes < 60 -> "${diffMinutes}m ago"
-                            diffMinutes < 1440 -> "${diffMinutes / 60}h ago"
-                            else -> "${diffMinutes / 1440}d ago"
+                            diffMinutes < 1 -> "刚刚"
+                            diffMinutes < 60 -> "${diffMinutes} 分钟前"
+                            diffMinutes < 1440 -> "${diffMinutes / 60} 小时前"
+                            else -> "${diffMinutes / 1440} 天前"
                         }
                     }
                     Text(
-                        "Last seen $lastConnectedTime",
+                        "上次连接：$lastConnectedTime",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (device.isPlus)
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Text(
-                        text = if (device.isPlus) "PLUS" else "FREE",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (device.isPlus)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
 
             Button(
@@ -135,11 +117,11 @@ fun LastConnectedDeviceCard(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.rounded_sync_desktop_24),
-                    contentDescription = "Quick connect",
+                    contentDescription = stringResource(R.string.ui_quick_connect),
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Quick Connect")
+                Text(stringResource(R.string.action_quick_connect))
             }
         }
     }

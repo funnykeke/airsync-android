@@ -32,17 +32,12 @@ import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import com.sameerasw.airsync.presentation.ui.screens.AirSyncMainScreen
 import com.sameerasw.airsync.ui.theme.AirSyncTheme
 import com.sameerasw.airsync.utils.AdbMdnsDiscovery
-import com.sameerasw.airsync.utils.ContentCaptureManager
 import com.sameerasw.airsync.utils.DevicePreviewResolver
-import com.sameerasw.airsync.utils.KeyguardHelper
-import com.sameerasw.airsync.utils.NotesRoleManager
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.ShortcutUtil
 import com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator
 import com.sameerasw.airsync.utils.WebSocketUtil
-import com.canerture.exceptionreport.handler.ExceptionReport
 import com.sameerasw.airsync.crash.CrashHandler
-import com.sameerasw.airsync.crash.CrashReportActivity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.net.URLDecoder
@@ -55,6 +50,14 @@ object AdbDiscoveryHolder {
             Log.d("AdbDiscoveryHolder", "Initializing ADB discovery")
             discovery = AdbMdnsDiscovery(context.applicationContext)
             discovery?.startDiscovery()
+        }
+    }
+
+    fun stop() {
+        if (discovery != null) {
+            Log.d("AdbDiscoveryHolder", "Stopping ADB discovery")
+            discovery?.stopDiscovery()
+            discovery = null
         }
     }
 
@@ -81,68 +84,7 @@ class MainActivity : ComponentActivity() {
     // Permission launcher for Android 13+ notification permission
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-    }
-
-    // Permission launchers for call-related permissions
-    private val callLogPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-    }
-
-    private val contactsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-    }
-
-    private val phonePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-    }
-
-    // Notes Role request launcher
-    private val notesRoleLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            Log.d("MainActivity", "Notes Role granted successfully")
-            Toast.makeText(this, "Notes Role granted!", Toast.LENGTH_SHORT).show()
-        } else {
-            Log.d("MainActivity", "Notes Role request denied or cancelled")
-            Toast.makeText(this, "Notes Role request cancelled", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // Content capture launcher
-    private val contentCaptureLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        ContentCaptureManager.handleCaptureResult(
-            resultCode = result.resultCode,
-            data = result.data,
-            onSuccess = { uri ->
-                Log.d("MainActivity", "Content captured: $uri")
-                Toast.makeText(this, "Content captured successfully", Toast.LENGTH_SHORT).show()
-                // TODO: Handle pasting captured image into clipboard chat
-            },
-            onFailed = {
-                Toast.makeText(this, "Content capture failed", Toast.LENGTH_SHORT).show()
-            },
-            onUserCanceled = {
-                Log.d("MainActivity", "User cancelled content capture")
-            },
-            onWindowModeUnsupported = {
-                Toast.makeText(
-                    this,
-                    "Content capture only available in floating window",
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            onBlockedByAdmin = {
-                Toast.makeText(this, "Content capture blocked by administrator", Toast.LENGTH_SHORT)
-                    .show()
-            }
-        )
+    ) { _ ->
     }
 
     private val qrScannerLauncher = registerForActivityResult(
@@ -154,18 +96,18 @@ class MainActivity : ComponentActivity() {
                 // Parse and connect with the QR code data
                 handleQRCodeResult(qrCode)
             }
-        } else {
-            // User cancelled or invalid QR, do nothing - app remains open
         }
     }
 
     override fun onStart() {
         super.onStart()
+        com.sameerasw.airsync.service.MediaNotificationListener.ensureListenerConnected(this)
         com.sameerasw.airsync.service.AirSyncService.notifyAppForeground(this)
     }
 
     override fun onStop() {
         super.onStop()
+        AdbDiscoveryHolder.stop()
         com.sameerasw.airsync.service.AirSyncService.notifyAppBackground(this)
     }
 
@@ -179,9 +121,7 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
 
-        ExceptionReport(this) { deviceInfo, stackTrace ->
-            CrashHandler.onCrash(applicationContext, deviceInfo, stackTrace)
-        }.setCustomActivity(CrashReportActivity::class.java)
+        CrashHandler.install(applicationContext)
 
         // Dynamically set the splash screen icon based on last connected device
         splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
@@ -322,18 +262,15 @@ class MainActivity : ComponentActivity() {
         // Keep splash screen visible while app is loading
         splashScreen.setKeepOnScreenCondition { !isAppReady }
 
-        // Handle Notes Role intent
-        handleNotesRoleIntent(intent)
-
-        // Start ADB discovery once at app startup and keep it running
-        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+        // Start ADB discovery only in local mode when permission is granted
+        val initialMode = runBlocking {
+            DataStoreManager.getInstance(applicationContext).getTransportMode().first()
+        }
+        if (initialMode == "local" && PermissionUtil.isLocalNetworkPermissionGranted(this)) {
             AdbDiscoveryHolder.initialize(this)
-            Log.d("MainActivity", "Started persistent ADB discovery at app startup")
+            Log.d("MainActivity", "Started ADB discovery at app startup (local mode)")
         } else {
-            Log.d(
-                "MainActivity",
-                "Skipping persistent ADB discovery at startup: ACCESS_LOCAL_NETWORK permission not granted"
-            )
+            AdbDiscoveryHolder.stop()
         }
 
         // Check if this is a QS tile long-press intent and device is not connected
@@ -366,7 +303,7 @@ class MainActivity : ComponentActivity() {
             val urlString = uri.toString()
             val queryPart = urlString.substringAfter('?', "")
             if (queryPart.isNotEmpty()) {
-                val params = queryPart.split('?')
+                val params = queryPart.replace('?', '&').split('&')
                 val paramMap = params.associate {
                     val parts = it.split('=', limit = 2)
                     val key = parts.getOrNull(0) ?: ""
@@ -375,7 +312,7 @@ class MainActivity : ComponentActivity() {
                 }
                 pcName = paramMap["name"]?.let { URLDecoder.decode(it, "UTF-8") }
                 isPlus = paramMap["plus"]?.toBooleanStrictOrNull() ?: false
-                symmetricKey = paramMap["key"]
+                symmetricKey = paramMap["key"]?.let { android.net.Uri.decode(it) }
             }
         }
 
@@ -496,23 +433,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestCallLogPermission() {
-        if (!PermissionUtil.isCallLogPermissionGranted(this)) {
-            callLogPermissionLauncher.launch(Manifest.permission.READ_CALL_LOG)
-        }
-    }
 
-    private fun requestContactsPermission() {
-        if (!PermissionUtil.isContactsPermissionGranted(this)) {
-            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-        }
-    }
 
-    private fun requestPhonePermission() {
-        if (!PermissionUtil.isPhoneStatePermissionGranted(this)) {
-            phonePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
-        }
-    }
 
     private fun handleQRCodeResult(qrCode: String) {
         try {
@@ -544,13 +466,10 @@ class MainActivity : ComponentActivity() {
                 return
             }
 
-            // Valid QR code, proceed with connection
-            val mainIntent = Intent(this, MainActivity::class.java).apply {
-                data = uri
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            startActivity(mainIntent)
-            finish()
+            // Rebuild this activity with the new pairing parameters. Starting a
+            // singleTop instance and then finishing it closes the pairing screen.
+            setIntent(Intent(this, MainActivity::class.java).setData(uri))
+            recreate()
         } catch (e: Exception) {
             Log.e("MainActivity", "Error handling QR code result: ${e.message}", e)
             Toast.makeText(
@@ -566,8 +485,10 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        // Handle Notes Role intent
-        handleNotesRoleIntent(intent)
+        if (intent?.data?.scheme == "airsync") {
+            recreate()
+            return
+        }
 
         // Check if this is a QS tile long-press intent
         if (intent?.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") {
@@ -589,11 +510,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        val ds = DataStoreManager.getInstance(applicationContext)
+        val isPaused = runBlocking { ds.isAppPaused().first() }
+        if (isPaused) return
+        val mode = runBlocking { ds.getTransportMode().first() }
+        if (mode != "local") {
+            AdbDiscoveryHolder.stop()
+            DiscoveryOrchestrator.stop(this)
+            return
+        }
         if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
-            val ds = DataStoreManager.getInstance(applicationContext)
-            val isPaused = runBlocking { ds.isAppPaused().first() }
-            if (isPaused) return
-
             AdbDiscoveryHolder.initialize(this)
             val isDiscoveryEnabled = runBlocking {
                 ds.getDeviceDiscoveryEnabled().first()
@@ -604,10 +530,13 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Ensure ADB discovery is running (started at app startup, this just verifies it's active).
+     * Ensure ADB discovery is running in local mode.
      */
     fun initializeAdbDiscovery() {
-        if (PermissionUtil.isLocalNetworkPermissionGranted(this)) {
+        val mode = runBlocking {
+            DataStoreManager.getInstance(applicationContext).getTransportMode().first()
+        }
+        if (mode == "local" && PermissionUtil.isLocalNetworkPermissionGranted(this)) {
             AdbDiscoveryHolder.initialize(this)
         }
     }
@@ -617,73 +546,5 @@ class MainActivity : ComponentActivity() {
      */
     fun getDiscoveredAdbServices(): List<AdbMdnsDiscovery.AdbServiceInfo> {
         return AdbDiscoveryHolder.getDiscoveredServices()
-    }
-
-    /**
-     * Handles intents related to the Notes Role feature.
-     * Extracts stylus mode hint and lock screen status from the intent.
-     */
-    private fun handleNotesRoleIntent(intent: Intent?) {
-        // Check if this is an ACTION_CREATE_NOTE intent
-        if (intent?.action == Intent.ACTION_CREATE_NOTE) {
-            Log.d("MainActivity", "Received ACTION_CREATE_NOTE intent")
-
-            // Check if stylus mode is requested
-            val useStylusMode = NotesRoleManager.shouldUseStylusMode(intent)
-            Log.d("MainActivity", "Stylus mode: $useStylusMode")
-
-            // Check if launched from lock screen
-            val launchedFromLockScreen = KeyguardHelper.isKeyguardLocked(this)
-            Log.d("MainActivity", "Launched from lock screen: $launchedFromLockScreen")
-
-            // If locked and device is secure, request unlock
-            if (launchedFromLockScreen && KeyguardHelper.isKeyguardSecure(this)) {
-                KeyguardHelper.requestDismissKeyguard(
-                    this,
-                    onDismissSucceeded = {
-                        Log.d("MainActivity", "Device unlocked successfully")
-                    },
-                    onDismissError = {
-                        Log.w("MainActivity", "Failed to unlock device")
-                    }
-                )
-            }
-        }
-    }
-
-    /**
-     * Request the Notes Role for this app.
-     * Call this from a UI button or during app initialization.
-     */
-    fun requestNotesRole() {
-        if (NotesRoleManager.isNotesRoleAvailable(this)) {
-            NotesRoleManager.requestNotesRole(this, notesRoleLauncher)
-        } else {
-            Toast.makeText(this, "Notes Role not available on this device", Toast.LENGTH_SHORT)
-                .show()
-        }
-    }
-
-    /**
-     * Launch content capture for note annotation.
-     * Should only be called when in floating window mode.
-     */
-    fun launchContentCapture() {
-        if (!NotesRoleManager.isRunningInFloatingWindow(this)) {
-            Toast.makeText(
-                this,
-                "Content capture only available in floating window",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        if (ContentCaptureManager.isScreenCaptureDisabled(this)) {
-            Toast.makeText(this, "Screen capture disabled by administrator", Toast.LENGTH_SHORT)
-                .show()
-            return
-        }
-
-        ContentCaptureManager.launchContentCapture(contentCaptureLauncher)
     }
 }

@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.activities
 
+import com.sameerasw.airsync.R
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.sameerasw.airsync.presentation.ui.screens.PermissionsScreen
@@ -38,29 +40,19 @@ class PermissionsActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { refreshUI() }
 
-    private val callLogPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { refreshUI() }
 
-    private val contactsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { refreshUI() }
 
-    private val phonePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { refreshUI() }
 
-    private val bluetoothPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { refreshUI() }
+
+
+
+
 
     private val localNetworkPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { refreshUI() }
 
-    private val answerCallsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { refreshUI() }
+
 
     private var refreshCounter by mutableStateOf(0)
 
@@ -103,13 +95,13 @@ class PermissionsActivity : ComponentActivity() {
                     topBar = {
                         TopAppBar(
                             title = {
-                                Text("Permissions")
+                                Text(stringResource(R.string.title_permissions))
                             },
                             navigationIcon = {
                                 IconButton(onClick = { finish() }) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Back"
+                                        contentDescription = getString(R.string.ui_back)
                                     )
                                 }
                             },
@@ -122,23 +114,8 @@ class PermissionsActivity : ComponentActivity() {
                         onRequestNotificationPermission = {
                             requestNotificationPermission()
                         },
-                        onRequestCallLogPermission = {
-                            requestCallLogPermission()
-                        },
-                        onRequestContactsPermission = {
-                            requestContactsPermission()
-                        },
-                        onRequestPhonePermission = {
-                            requestPhonePermission()
-                        },
-                        onRequestBluetoothPermission = {
-                            requestBluetoothPermission()
-                        },
                         onRequestLocalNetworkPermission = {
                             requestLocalNetworkPermission()
-                        },
-                        onRequestAnswerCallsPermission = {
-                            requestAnswerCallsPermission()
                         },
                         refreshTrigger = refreshCounter
                     )
@@ -159,37 +136,9 @@ class PermissionsActivity : ComponentActivity() {
         }
     }
 
-    private fun requestCallLogPermission() {
-        if (!PermissionUtil.isCallLogPermissionGranted(this)) {
-            callLogPermissionLauncher.launch(Manifest.permission.READ_CALL_LOG)
-        }
-    }
 
-    private fun requestContactsPermission() {
-        if (!PermissionUtil.isContactsPermissionGranted(this)) {
-            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-        }
-    }
 
-    private fun requestPhonePermission() {
-        if (!PermissionUtil.isPhoneStatePermissionGranted(this)) {
-            phonePermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
-        }
-    }
 
-    private fun requestBluetoothPermission() {
-        if (!PermissionUtil.isBluetoothPermissionsGranted(this)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                bluetoothPermissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.BLUETOOTH_SCAN,
-                        Manifest.permission.BLUETOOTH_CONNECT,
-                        Manifest.permission.BLUETOOTH_ADVERTISE
-                    )
-                )
-            }
-        }
-    }
 
     private fun requestLocalNetworkPermission() {
         if (Build.VERSION.SDK_INT >= 37) {
@@ -199,13 +148,6 @@ class PermissionsActivity : ComponentActivity() {
         }
     }
 
-    private fun requestAnswerCallsPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!PermissionUtil.isAnswerCallsPermissionGranted(this)) {
-                answerCallsPermissionLauncher.launch(Manifest.permission.ANSWER_PHONE_CALLS)
-            }
-        }
-    }
 
     override fun onResume() {
         super.onResume()

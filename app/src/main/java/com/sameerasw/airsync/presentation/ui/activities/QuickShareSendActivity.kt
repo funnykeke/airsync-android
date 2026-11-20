@@ -42,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +89,8 @@ class QuickShareSendActivity : ComponentActivity() {
                     uris = uris,
                     sharedText = sharedText,
                     pairedDeviceName = uiState.lastConnectedDevice?.name,
+                    isConnected = uiState.isConnected,
+                    transportMode = uiState.transportMode,
                     onFinished = { finish() }
                 )
             }
@@ -135,11 +138,16 @@ private fun QuickShareSendScreen(
     uris: List<Uri>,
     sharedText: String?,
     pairedDeviceName: String?,
+    isConnected: Boolean,
+    transportMode: String,
     onFinished: () -> Unit
 ) {
     val context = LocalContext.current
     var uiState by remember { mutableStateOf<SendUiState>(SendUiState.Loading) }
     var hasStarted by remember { mutableStateOf(false) }
+    val currentConnected by rememberUpdatedState(isConnected)
+    val currentMode by rememberUpdatedState(transportMode)
+    val currentPairedName by rememberUpdatedState(pairedDeviceName)
 
     LaunchedEffect(hasWindowFocus) {
         if (hasWindowFocus && !hasStarted) {
@@ -150,8 +158,16 @@ private fun QuickShareSendScreen(
                 uiState = SendUiState.Error("Nothing to send")
                 delay(1500)
                 onFinished()
-            } else if (pairedDeviceName.isNullOrBlank()) {
+            } else if (currentPairedName.isNullOrBlank()) {
                 uiState = SendUiState.Error("No Mac paired")
+                delay(1500)
+                onFinished()
+            } else if (!currentConnected) {
+                uiState = SendUiState.Error("请先连接 Mac")
+                delay(1500)
+                onFinished()
+            } else if (uris.isNotEmpty() && currentMode != "local") {
+                uiState = SendUiState.Error("文件分享仅支持局域网连接")
                 delay(1500)
                 onFinished()
             } else if (uris.isEmpty()) {
@@ -230,14 +246,14 @@ private fun QuickShareSendScreen(
 
                             is SendUiState.Success -> Icon(
                                 imageVector = Icons.Rounded.CheckCircle,
-                                contentDescription = "Success",
+                                contentDescription = stringResource(R.string.ui_success),
                                 modifier = Modifier.size(28.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
 
                             is SendUiState.Error -> Icon(
                                 imageVector = Icons.Rounded.Error,
-                                contentDescription = "Error",
+                                contentDescription = stringResource(R.string.ui_error),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -296,7 +312,7 @@ private fun copyUrisToCache(context: Context, uris: List<Uri>): List<Uri> {
     }
 }
 
-@Preview(name = "Loading", showBackground = true)
+@Preview(name = "preview", showBackground = true)
 @Composable
 private fun QuickShareSendScreenPreviewLoading() {
     AirSyncTheme {
@@ -304,7 +320,9 @@ private fun QuickShareSendScreenPreviewLoading() {
             hasWindowFocus = true,
             uris = emptyList(),
             sharedText = null,
-            pairedDeviceName = "Sameera's Mac",
+            pairedDeviceName = "My Mac",
+            isConnected = true,
+            transportMode = "local",
             onFinished = {}
         )
     }

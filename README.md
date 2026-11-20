@@ -1,31 +1,33 @@
-# airsync-android
-Android app for AirSync built with Kotlin Jetpack Compose
+# AirSync Android（省电精简中文修改版）
 
-Min : Android 11
+本仓库为基于开源项目 [sameerasw/airsync-android](https://github.com/sameerasw/airsync-android) 派生的**非官方省电精简修改版**，由 [funnykeke](https://github.com/funnykeke) 维护，面向个人日常低功耗使用场景。
 
-[<img src="https://steverichey.github.io/google-play-badge-svg/img/en_get.svg" width="30%" />](https://play.google.com/store/apps/details?id=com.sameerasw.airsync)
+## 主要修改内容
 
+- **省电与精简**：移除通话/联系人同步、BLE 蓝牙发现、壁纸同步、笔记角色与远程控制等高耗电或不常用模块及冗余权限、依赖（移除 Room/KSP、Gson、libphonenumber、Coil GIF、JitPack 依赖等）。
+- **局域网 + 自建中转双模式**：支持同 Wi-Fi 局域网直连（含快传、剪贴板、通知、媒体与文件访问）以及跨网自建中转模式（`relay-server/`）。中转模式下自动停止局域网广播/扫描、WakeupService、WebDAV 与 ADB mDNS 监听，显著降低待机耗电。
+- **中转 TLS 脱敏与灵活配置**：支持标准 CA 证书（SHA-256 指纹留空走系统信任链）及可选的 64 位十六进制叶证书指纹固定（适用于自签证书），源码不含任何硬编码个人服务器地址或证书。
+- **全面中文化**：界面、设置页、小组件、快捷方式、磁贴、通知通道、媒体控制、快传提示及离线帮助页均已中文化。
+- **无痛升级兼容**：保持原包名 `com.sameerasw.airsync`，自签名安装后保留既有配置。
 
-## Features
-- QR Code / Google Lens pairing for quick setup
-- Real-time notification mirroring and actionable replies
-- Media playback and volume control from Mac
-- Cross-device clipboard synchronization
-- **Cellular Network Monitoring**: View your Android's cellular status (LTE, 5G, No Signal) directly from your Mac's menu bar.
-- **Auto-Start Support**: Enhanced background stability with auto-start helpers for various Android OEMs (Xiaomi, OPPO, Vivo, Letv, etc.).
+## 构建说明
 
-## How to connect?
-Use your built-in camera or Google Lens or anything that can scan a QR code. It will prompt you to open the app. Once authorized, the last device will be saved on the mobile for now for easier reconnection.
+- 需要 JDK 21 与 Android SDK。
+- 默认构建 `arm64-v8a`（可通过 `-Pairsync.abi=all` 构建全架构）：
 
-## [Read Documentation and How-To](https://airsync.notion.site/)
+```bash
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+```
 
+Release 签名请将本地 keystore 路径与密码配置在被 `.gitignore` 忽略的 `signing.properties` 中，切勿将签名密钥提交到仓库。
 
-## Thanks!
+## 配套组件
 
-- To you, seriously…
-- To my community mostly known as TIDWIB (Things I Do When I’m Bored ….. see the connection)
-- May sound weird but AI, Yeah, without that deep research, assistant in helpless topics, explanations, occasional detonations and all lead to the rapid development of AirSync. Without this, how da hell do I implement a notification listener without weeks of study? Yeah, if you know how to use it efficiently, it is a damn good buddy to do things that you never could imagine.
-- All the reddit peeps for showing that this is actually a thing that they wanted.
-- [ClipSync](https://github.com/WinShell-Bhanu/Clipsync) by Bhanu, which the background clipboard sync is adapted from (MIT, see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
-- All the libraries, apps and tools used for development and their creators. Issue volunteers, reddit community helpers…
-- My sleep schedule… the lack of.
+- **自建中转服务**：见本仓库 [relay-server/README.md](relay-server/README.md)。
+- **macOS 端**：遵循上游 macOS 仓库附加条款（不公开分发修改版二进制），macOS 端修改版源码保留在私有仓库中仅供自编译使用。
+
+## 开源协议与致谢
+
+- 原项目：[sameerasw/airsync-android](https://github.com/sameerasw/airsync-android)（MPL-2.0 协议及附加条款，完整保留于 [LICENSE](LICENSE)）。
+- 第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)（含 ClipSync 致谢）。
+- 本修改版为非官方派生分支，与原作者无从属关系。

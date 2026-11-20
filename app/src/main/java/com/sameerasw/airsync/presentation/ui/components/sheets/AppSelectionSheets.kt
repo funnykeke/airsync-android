@@ -99,7 +99,7 @@ fun AppSelectionSheet(
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.rounded_invert_colors_24),
-                        contentDescription = "Invert Selection",
+                        contentDescription = stringResource(R.string.ui_invert_selection),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -110,11 +110,11 @@ fun AppSelectionSheet(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search apps") },
+                placeholder = { Text(stringResource(R.string.action_search_apps)) },
                 leadingIcon = {
                     Icon(
                         painter = painterResource(id = R.drawable.outline_info_24), // Fallback search icon
-                        contentDescription = "Search"
+                        contentDescription = stringResource(R.string.ui_search)
                     )
                 },
                 singleLine = true,
@@ -141,7 +141,7 @@ fun AppSelectionSheet(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Show system apps",
+                    text = stringResource(R.string.ui_show_system_apps),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                     color = MaterialTheme.colorScheme.onSurface
@@ -240,7 +240,7 @@ fun AppToggleItem(
                 if (shouldShowSystemTag) {
                     Icon(
                         painter = painterResource(id = R.drawable.rounded_android_24),
-                        contentDescription = "System App",
+                        contentDescription = stringResource(R.string.ui_system_app),
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )

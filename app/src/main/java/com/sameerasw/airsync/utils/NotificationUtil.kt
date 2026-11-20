@@ -22,7 +22,7 @@ object NotificationUtil {
 
 
     private fun createContinueBrowsingChannel(context: Context) {
-        val name = "Continue browsing"
+        val name = context.getString(R.string.ui_continue_browsing)
         val descriptionText = "Quick open links received from desktop"
         val importance = NotificationManager.IMPORTANCE_LOW
         val channel = NotificationChannel(CONTINUE_CHANNEL_ID, name, importance).apply {
@@ -38,7 +38,7 @@ object NotificationUtil {
 
     // File transfer notifications remain unchanged
     fun createFileChannel(context: Context) {
-        val name = "File transfers"
+        val name = context.getString(R.string.ui_file_transfers)
         val descriptionText = "Notifications for file transfers"
         // Use IMPORTANCE_HIGH for Top Priority visibility
         val importance = NotificationManager.IMPORTANCE_HIGH
@@ -77,7 +77,7 @@ object NotificationUtil {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val modeTitle = if (isSending) "Sending" else "Receiving"
+        val modeTitle = context.getString(if (isSending) R.string.notif_file_sending else R.string.notif_file_receiving)
         val title = "$modeTitle: $fileName"
         val icon =
             if (isSending) android.R.drawable.stat_sys_upload else android.R.drawable.stat_sys_download
@@ -98,7 +98,7 @@ object NotificationUtil {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColorized(false)
             .setShowWhen(false)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancelPending)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, context.getString(R.string.action_cancel), cancelPending)
 
         try {
             builder.javaClass.getMethod(
@@ -138,13 +138,13 @@ object NotificationUtil {
         val icon: Int
 
         if (isSending) {
-            title = if (success) "Sent: $fileName" else "Sending failed: $fileName"
-            text = if (success) "Transfer complete" else "Could not send file"
+            title = context.getString(if (success) R.string.notif_file_sent else R.string.notif_file_send_failed, fileName)
+            text = context.getString(if (success) R.string.notif_transfer_complete else R.string.notif_could_not_send_file)
             icon =
                 if (success) android.R.drawable.stat_sys_upload_done else android.R.drawable.stat_notify_error
         } else {
-            title = if (success) "Received: $fileName" else "Download failed: $fileName"
-            text = if (success) "Saved to Downloads" else "Verification failed"
+            title = context.getString(if (success) R.string.notif_file_received else R.string.notif_file_download_failed, fileName)
+            text = context.getString(if (success) R.string.notif_saved_to_downloads else R.string.notif_verification_failed)
             icon =
                 if (success) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error
         }
@@ -169,7 +169,7 @@ object NotificationUtil {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             builder.setContentIntent(pending)
-            builder.addAction(android.R.drawable.ic_menu_view, "Open", pending)
+            builder.addAction(android.R.drawable.ic_menu_view, context.getString(R.string.action_open), pending)
         }
 
         val notif = builder.build()
@@ -213,7 +213,7 @@ object NotificationUtil {
 
         val builder = NotificationCompat.Builder(context, CONTINUE_CHANNEL_ID)
             .setSmallIcon(R.drawable.outline_open_in_browser_24)
-            .setContentTitle("Continue browsing")
+            .setContentTitle(context.getString(R.string.ui_continue_browsing))
             .setContentText(trimmed)
             .setStyle(NotificationCompat.BigTextStyle().bigText(trimmed))
             .setAutoCancel(true)
@@ -221,8 +221,8 @@ object NotificationUtil {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setSilent(true)
             .setContentIntent(openPending)
-            .addAction(android.R.drawable.ic_menu_view, "Open", openPending)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending)
+            .addAction(android.R.drawable.ic_menu_view, context.getString(R.string.action_open), openPending)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, context.getString(R.string.action_dismiss), dismissPending)
 
         try {
             manager.notify(notifId, builder.build())

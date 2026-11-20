@@ -35,12 +35,7 @@ enum class PermissionType {
     POST_NOTIFICATIONS,
     BACKGROUND_USAGE,
     WALLPAPER_ACCESS,
-    CALL_LOG,
-    CONTACTS,
-    PHONE,
-    BLUETOOTH,
     LOCAL_NETWORK,
-    ANSWER_CALLS,
     CLIPBOARD_ACCESSIBILITY
 }
 
@@ -122,7 +117,7 @@ fun PermissionExplanationDialog(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Why AirSync needs this permission:",
+                            text = context.getString(R.string.ui_why_airsync_needs_this_permission),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
@@ -145,7 +140,7 @@ fun PermissionExplanationDialog(
                     OutlinedButton(
                         onClick = onDismiss,
                     ) {
-                        Text("Dismiss")
+                        Text(context.getString(R.string.action_dismiss))
                     }
 
                     Button(
@@ -165,67 +160,35 @@ fun PermissionExplanationDialog(
 private fun getPermissionInfo(context: Context, permissionType: PermissionType): PermissionInfo {
     return when (permissionType) {
         PermissionType.NOTIFICATION_ACCESS -> PermissionInfo(
-            title = "Notification Access",
+            title = context.getString(R.string.ui_notification_access),
             icon = R.drawable.rounded_notification_settings_24,
-            description = "AirSync needs access to read your device notifications to sync them with your mac in real-time.",
-            whyNeeded = "This is the core functionality of AirSync. Without notification access, the app cannot read incoming notifications from other apps and forward them to your mac. \nThe media now playing status also relies on this permission. \nThe app will use this permission only for the explained use cases and will always sync these data via an encrypted local network",
-            buttonText = "Grant Notification Access"
+            description = context.getString(R.string.ui_airsync_needs_access_to_read_your_device_notific),
+            whyNeeded = context.getString(R.string.permission_notif_access_why),
+            buttonText = context.getString(R.string.ui_grant_notification_access)
         )
 
         PermissionType.POST_NOTIFICATIONS -> PermissionInfo(
-            title = "Post Notifications",
+            title = context.getString(R.string.ui_post_notifications),
             icon = R.drawable.rounded_notifications_active_24,
-            description = "On Android 13+, apps need explicit permission to display notifications. AirSync uses this to show connection status and sync confirmations.",
-            whyNeeded = "AirSync needs to show you important notifications about connection status, sync progress, and any errors that occur during operation.",
-            buttonText = "Allow Notifications"
+            description = context.getString(R.string.ui_on_android_13_apps_need_explicit_permission_to_d),
+            whyNeeded = context.getString(R.string.permission_post_notif_why),
+            buttonText = context.getString(R.string.ui_allow_notifications)
         )
 
         PermissionType.BACKGROUND_USAGE -> PermissionInfo(
-            title = "Background App Usage",
+            title = context.getString(R.string.ui_background_app_usage),
             icon = R.drawable.rounded_local_laundry_service_24,
-            description = "Android's battery optimization can kill background apps. Disabling this for AirSync ensures reliable notification syncing even when you're not actively using the app.",
-            whyNeeded = "Modern Android aggressively kills background apps to save battery. AirSync needs to run continuously to sync notifications in real-time. \nThis may result in minor battery drain increases but will ensure the connection stays stable and functions when the app is not in focus like QS tiles work well.",
-            buttonText = "Disable Battery Optimization"
+            description = context.getString(R.string.ui_android_s_battery_optimization_can_kill_backgrou),
+            whyNeeded = context.getString(R.string.permission_background_why),
+            buttonText = context.getString(R.string.ui_disable_battery_optimization)
         )
 
         PermissionType.WALLPAPER_ACCESS -> PermissionInfo(
-            title = "Wallpaper & File Access",
+            title = context.getString(R.string.ui_wallpaper_file_access),
             icon = R.drawable.rounded_folder_managed_24,
-            description = "This optional permission allows AirSync to sync your phone's wallpaper to your Mac, and lets your Mac browse your phone's storage as a Finder volume when the File Access feature is turned on.",
-            whyNeeded = "To read your current wallpaper, and to let your paired Mac mount your phone's storage over Wi-Fi (the File Access feature in the Mac app's settings), AirSync needs broader storage permissions than regular apps get. \nThis permission is only used for these two features — wallpaper sync always, and file browsing only while File Access is explicitly enabled on your Mac and only over your local network.",
-            buttonText = "Grant Storage Access"
-        )
-
-        PermissionType.CALL_LOG -> PermissionInfo(
-            title = "Call Log Access",
-            icon = R.drawable.rounded_call_log_24,
-            description = "AirSync needs call log access to identify the caller's phone number for real-time alerts on your Mac.",
-            whyNeeded = "To provide accurate call notifications on your Mac, Android requires the Call Log permission to see the phone number of an incoming call. \n\nWithout this, your Mac will only show 'Unknown Caller'. This permission is used strictly to identify the caller in real-time and provide alerts for missed or incoming calls. \n\nThis data is only shared with your own Mac over your secure local network and is never stored on our servers.",
-            buttonText = "Grant Call Log Access"
-        )
-
-        PermissionType.CONTACTS -> PermissionInfo(
-            title = "Contacts Access",
-            icon = R.drawable.rounded_contacts_24,
-            description = "AirSync needs access to your contacts to match phone numbers with names on your Mac.",
-            whyNeeded = "To provide a seamless companion experience, AirSync uses your contact names so you can see who is calling or who sent a notification directly on your Mac desktop. \n\nWithout this, you would only see phone numbers. Your contacts are never uploaded to any external servers; they are only used locally to enhance the connection between your phone and your Mac.",
-            buttonText = "Grant Contacts Access"
-        )
-
-        PermissionType.PHONE -> PermissionInfo(
-            title = "Phone Access",
-            icon = R.drawable.rounded_settings_phone_24,
-            description = "AirSync needs to detect your phone's state to notify you of incoming calls in real-time.",
-            whyNeeded = "This permission allows AirSync to detect when your phone is ringing, when you answer, or when a call ends, so it can display a live call status on your Mac. \n\nAirSync NEVER accesses your call audio or records conversations. This is used solely to facilitate the remote call notification feature as a device companion.",
-            buttonText = "Grant Phone Access"
-        )
-
-        PermissionType.BLUETOOTH -> PermissionInfo(
-            title = "Bluetooth Access",
-            icon = R.drawable.rounded_sync_desktop_24,
-            description = "AirSync uses Bluetooth Low Energy (BLE) as a secondary transport to sync notifications and media controls with your Mac when Wi-Fi is unavailable.",
-            whyNeeded = "To discover and connect to your Mac via Bluetooth, Android requires Bluetooth permissions (Scan, Connect, and Advertise). \n\nThis enables a low-power background connection that keeps your devices synced even when they aren't on the same Wi-Fi network. AirSync only uses Bluetooth to communicate with your authorized Mac devices.",
-            buttonText = "Grant Bluetooth Access"
+            description = context.getString(R.string.ui_this_optional_permission_allows_airsync_to_sync_),
+            whyNeeded = context.getString(R.string.permission_storage_why),
+            buttonText = context.getString(R.string.ui_grant_storage_access)
         )
 
         PermissionType.LOCAL_NETWORK -> PermissionInfo(
@@ -234,14 +197,6 @@ private fun getPermissionInfo(context: Context, permissionType: PermissionType):
             description = context.getString(R.string.permission_local_network_explain),
             whyNeeded = context.getString(R.string.permission_local_network_why),
             buttonText = context.getString(R.string.permission_local_network_button)
-        )
-
-        PermissionType.ANSWER_CALLS -> PermissionInfo(
-            title = context.getString(R.string.permission_answer_calls_title),
-            icon = R.drawable.rounded_settings_phone_24,
-            description = context.getString(R.string.permission_answer_calls_explain),
-            whyNeeded = context.getString(R.string.permission_answer_calls_why),
-            buttonText = context.getString(R.string.permission_answer_calls_button)
         )
 
         PermissionType.CLIPBOARD_ACCESSIBILITY -> PermissionInfo(

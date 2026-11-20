@@ -35,13 +35,7 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getDeviceName()
     }
 
-    override suspend fun setFirstRun(isFirstRun: Boolean) {
-        dataStoreManager.setFirstRun(isFirstRun)
-    }
 
-    override fun getFirstRun(): Flow<Boolean> {
-        return dataStoreManager.getFirstRun()
-    }
 
     override suspend fun setPermissionsChecked(checked: Boolean) {
         dataStoreManager.setPermissionsChecked(checked)
@@ -192,13 +186,7 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getKeepPreviousLinkEnabled()
     }
 
-    override suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean) {
-        dataStoreManager.setSmartspacerShowWhenDisconnected(enabled)
-    }
 
-    override fun getSmartspacerShowWhenDisconnected(): Flow<Boolean> {
-        return dataStoreManager.getSmartspacerShowWhenDisconnected()
-    }
 
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
         dataStoreManager.setUserManuallyDisconnected(disconnected)
@@ -266,14 +254,6 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getWidgetTransparency()
     }
 
-    override suspend fun setEssentialsConnectionEnabled(enabled: Boolean) {
-        dataStoreManager.setEssentialsConnectionEnabled(enabled)
-    }
-
-    override fun getEssentialsConnectionEnabled(): Flow<Boolean> {
-        return dataStoreManager.getEssentialsConnectionEnabled()
-    }
-
     override suspend fun setExpandNetworkingEnabled(enabled: Boolean) {
         dataStoreManager.setExpandNetworkingEnabled(enabled)
     }
@@ -290,29 +270,11 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.getDeviceDiscoveryEnabled()
     }
 
-    override suspend fun setFirstMacConnectionTime(time: Long) {
-        dataStoreManager.setFirstMacConnectionTime(time)
-    }
 
-    override fun getFirstMacConnectionTime(): Flow<Long> {
-        return dataStoreManager.getFirstMacConnectionTime()
-    }
 
-    override suspend fun setLastPromptDismissedVersion(version: Int) {
-        dataStoreManager.setLastPromptDismissedVersion(version)
-    }
 
-    override fun getLastPromptDismissedVersion(): Flow<Int> {
-        return dataStoreManager.getLastPromptDismissedVersion()
-    }
 
-    override suspend fun setHasRatedApp(hasRated: Boolean) {
-        dataStoreManager.setHasRatedApp(hasRated)
-    }
 
-    override fun hasRatedApp(): Flow<Boolean> {
-        return dataStoreManager.hasRatedApp()
-    }
 
     override suspend fun setQuickShareEnabled(enabled: Boolean) {
         dataStoreManager.setQuickShareEnabled(enabled)

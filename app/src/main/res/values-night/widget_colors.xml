@@ -19,9 +19,5 @@
     <color name="widget_primary_button">#D0BCFF</color>
     <color name="widget_secondary_button">#49454F</color>
     <color name="widget_button_border">#938F99</color>
-
-    <!-- Plus badge (dark theme) -->
-    <color name="widget_plus_badge_bg">#D0BCFF</color>
-    <color name="plus_badge_bg">#D0BCFF</color>
 </resources>
 

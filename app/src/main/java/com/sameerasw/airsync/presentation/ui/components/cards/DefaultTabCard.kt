@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,12 +51,12 @@ fun DefaultTabCard(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Default tab",
+                text = stringResource(R.string.ui_default_tab),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Select which tab the app should open to by default",
+                text = stringResource(R.string.ui_select_which_tab_the_app_should_open_to_by_defau),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
@@ -67,7 +68,7 @@ fun DefaultTabCard(
                 horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)
             ) {
                 TabOption(
-                    title = "Connect",
+                    title = stringResource(R.string.ui_connect),
                     iconRes = R.drawable.rounded_devices_24,
                     isSelected = currentDefaultTab == "connect",
                     onClick = {
@@ -76,7 +77,7 @@ fun DefaultTabCard(
                     }
                 )
                 TabOption(
-                    title = "Remote",
+                    title = stringResource(R.string.ui_remote),
                     icon = Icons.Filled.Gamepad,
                     isSelected = currentDefaultTab == "remote",
                     onClick = {
@@ -85,7 +86,7 @@ fun DefaultTabCard(
                     }
                 )
                 TabOption(
-                    title = "Clipboard",
+                    title = stringResource(R.string.ui_clipboard),
                     icon = Icons.Filled.ContentPaste,
                     isSelected = currentDefaultTab == "clipboard",
                     onClick = {
@@ -94,7 +95,7 @@ fun DefaultTabCard(
                     }
                 )
                 TabOption(
-                    title = "Dynamic",
+                    title = stringResource(R.string.ui_dynamic),
                     iconRes = R.drawable.rounded_asterisk_24,
                     isSelected = currentDefaultTab == "dynamic",
                     onClick = {

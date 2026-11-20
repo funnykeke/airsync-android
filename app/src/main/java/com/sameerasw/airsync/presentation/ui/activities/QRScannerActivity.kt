@@ -1,5 +1,7 @@
 package com.sameerasw.airsync.presentation.ui.activities
 
+import androidx.compose.ui.res.stringResource
+import com.sameerasw.airsync.R
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -203,7 +205,7 @@ private fun QRScannerScreen(
         ) {
             Icon(
                 Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.ui_back),
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -220,7 +222,7 @@ private fun QRScannerScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Scan the QR code to connect",
+                stringResource(R.string.qr_scan_hint),
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium

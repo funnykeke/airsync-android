@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -78,15 +79,15 @@ fun PermissionsCard(
                     .padding(horizontal = 12.dp)
             ) {
                 Text(
-                    "Permissions",
+                    stringResource(R.string.title_permissions),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (hasMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     if (hasMissing)
-                        "$missingPermissionsCount missing"
+                        stringResource(R.string.permissions_missing_count, missingPermissionsCount)
                     else
-                        "All permissions granted",
+                        stringResource(R.string.permissions_all_granted),
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (hasMissing) MaterialTheme.colorScheme.error.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -94,7 +95,7 @@ fun PermissionsCard(
 
             Icon(
                 painter = painterResource(id = R.drawable.rounded_keyboard_arrow_right_24),
-                contentDescription = "Open permissions",
+                contentDescription = stringResource(R.string.ui_open_permissions),
                 modifier = Modifier.size(24.dp),
                 tint = if (hasMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
             )

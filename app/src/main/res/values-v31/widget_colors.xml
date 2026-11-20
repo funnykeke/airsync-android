@@ -16,7 +16,4 @@
     <color name="widget_secondary_button">@android:color/system_neutral1_0</color>
     <color name="widget_button_border">@android:color/system_neutral2_400</color>
     <color name="widget_on_primary">@android:color/system_neutral1_10</color>
-
-    <color name="widget_plus_badge_bg">@android:color/system_accent1_600</color>
-    <color name="plus_badge_bg">@android:color/system_accent1_600</color>
 </resources>

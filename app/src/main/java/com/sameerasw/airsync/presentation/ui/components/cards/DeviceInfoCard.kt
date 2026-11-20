@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.cards
 
+import com.sameerasw.airsync.R
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -33,15 +35,15 @@ fun DeviceInfoCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            Text("My Android", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.label_my_android), style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Local IP: $localIp", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.label_local_ip, localIp), style = MaterialTheme.typography.bodyMedium)
 
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = deviceName,
                 onValueChange = onDeviceNameChange,
-                label = { Text("Device Name") },
+                label = { Text(stringResource(R.string.label_device_name)) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
             )

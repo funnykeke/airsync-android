@@ -1,5 +1,7 @@
 package com.sameerasw.airsync.presentation.ui.components
 
+import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.presentation.ui.components.cards.TransportModeCard
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -53,17 +55,16 @@ import com.sameerasw.airsync.domain.model.DeviceInfo
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.presentation.ui.components.buttons.ListExpandToggleButton
 import com.sameerasw.airsync.presentation.ui.components.cards.ClipboardFeaturesCard
+import com.sameerasw.airsync.presentation.ui.components.cards.RootClipboardSettings
 import com.sameerasw.airsync.presentation.ui.components.cards.DefaultTabCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
-import com.sameerasw.airsync.presentation.ui.components.cards.ExpandNetworkingCard
 import com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
 import com.sameerasw.airsync.presentation.ui.components.cards.MediaSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTilesCard
-import com.sameerasw.airsync.presentation.ui.components.cards.SmartspacerCard
 import com.sameerasw.airsync.presentation.ui.components.sheets.AppSelectionSheet
 import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.HapticUtil
@@ -104,7 +105,6 @@ fun SettingsView(
     onSendMessage: (String) -> Unit = {},
     onExport: (String) -> Unit = {},
     onImport: () -> Unit = {},
-    onResetOnboarding: () -> Unit = {},
     onShowHelp: () -> Unit = {},
     onToggleDeveloperMode: () -> Unit = {},
     onAvatarLongClickWithPosition: ((Offset) -> Unit)? = null,
@@ -186,7 +186,7 @@ fun SettingsView(
         )
 
         if (activeCategory == null) {
-            // Top 
+            // Top
             RoundedCardContainer {
                 PermissionsCard(missingPermissionsCount = uiState.missingPermissions.size)
 
@@ -215,14 +215,14 @@ fun SettingsView(
             }
 
             // Connection Section
-            SettingsCategory(title = "Connection") {
+            SettingsCategory(title = stringResource(R.string.ui_connection)) {
                 DeviceInfoCard(
                     deviceName = uiState.deviceNameInput,
                     localIp = deviceInfo.localIp,
                     onDeviceNameChange = { viewModel.updateDeviceName(it) }
                 )
 
-                ExpandNetworkingCard(context)
+// 自用版本：已用「服务器中转」替代扩展网络
             }
 
             AnimatedVisibility(
@@ -250,7 +250,6 @@ fun SettingsView(
                                 onIpChange = { viewModel.updateIpAddress(it) },
                                 onPortChange = { viewModel.updatePort(it) },
                                 onPcNameChange = { viewModel.updateManualPcName(it) },
-                                onIsPlusChange = { viewModel.updateManualIsPlus(it) },
                                 onSymmetricKeyChange = {
                                     viewModel.updateSymmetricKey(it)
                                 },
@@ -262,10 +261,10 @@ fun SettingsView(
             }
 
             // Settings Categories Section
-            SettingsCategory(title = "Settings") {
+            SettingsCategory(title = stringResource(R.string.ui_settings)) {
                 IconToggleItem(
-                    title = "App",
-                    description = "Tab defaults, theme, and more",
+                    title = stringResource(R.string.ui_app),
+                    description = stringResource(R.string.ui_tab_defaults_theme_and_more),
                     iconRes = R.drawable.rounded_devices_24,
                     showToggle = false,
                     onClick = {
@@ -275,8 +274,8 @@ fun SettingsView(
                 )
 
                 IconToggleItem(
-                    title = "Notifications",
-                    description = "Notifications and per-app settings",
+                    title = stringResource(R.string.ui_notifications),
+                    description = stringResource(R.string.ui_notifications_and_per_app_settings),
                     iconRes = R.drawable.rounded_notifications_active_24,
                     showToggle = false,
                     onClick = {
@@ -286,8 +285,8 @@ fun SettingsView(
                 )
 
                 IconToggleItem(
-                    title = "Clipboard",
-                    description = "Clipboard and link settings",
+                    title = stringResource(R.string.ui_clipboard),
+                    description = stringResource(R.string.ui_clipboard_and_link_settings),
                     iconRes = R.drawable.ic_clipboard_24,
                     showToggle = false,
                     onClick = {
@@ -297,8 +296,8 @@ fun SettingsView(
                 )
 
                 IconToggleItem(
-                    title = "Media and Files",
-                    description = "Media controls, Quick Share, and more",
+                    title = stringResource(R.string.ui_media_and_files),
+                    description = stringResource(R.string.ui_media_controls_quick_share_and_more),
                     iconRes = R.drawable.rounded_folder_managed_24,
                     showToggle = false,
                     onClick = {
@@ -308,19 +307,8 @@ fun SettingsView(
                 )
 
                 IconToggleItem(
-                    title = "Integrations",
-                    description = "Connect with external apps",
-                    iconRes = R.drawable.rounded_extension_24,
-                    showToggle = false,
-                    onClick = {
-                        HapticUtil.performClick(haptics)
-                        onCategoryChange("Integrations")
-                    }
-                )
-
-                IconToggleItem(
-                    title = "Widget",
-                    description = "Home screen widget customization",
+                    title = stringResource(R.string.ui_widget),
+                    description = stringResource(R.string.ui_home_screen_widget_customization),
                     iconRes = R.drawable.rounded_web_24,
                     showToggle = false,
                     onClick = {
@@ -341,7 +329,7 @@ fun SettingsView(
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
-                SettingsCategory(title = "Advanced") {
+                SettingsCategory(title = stringResource(R.string.ui_advanced)) {
                     DeveloperModeCard(
                         isDeveloperMode = uiState.isDeveloperMode,
                         onToggleDeveloperMode = { viewModel.setDeveloperMode(it) },
@@ -388,11 +376,10 @@ fun SettingsView(
                             onSendMessage(message)
                         },
                         onSendDeviceStatus = {
-                            val message =
-                                com.sameerasw.airsync.utils.DeviceInfoUtil.generateDeviceStatusJson(
-                                    context
-                                )
-                            onSendMessage(message)
+                            scope.launch(Dispatchers.IO) {
+                                val message = com.sameerasw.airsync.utils.DeviceInfoUtil.generateDeviceStatusJson(context)
+                                onSendMessage(message)
+                            }
                         },
                         onExportData = {
                             viewModel.setLoading(true)
@@ -402,7 +389,7 @@ fun SettingsView(
                                     scope.launch(Dispatchers.Main) {
                                         Toast.makeText(
                                             context,
-                                            "Export failed",
+                                            context.getString(R.string.toast_export_failed),
                                             Toast.LENGTH_LONG
                                         ).show()
                                         viewModel.setLoading(false)
@@ -417,9 +404,6 @@ fun SettingsView(
                         onImportData = {
                             onImport()
                         },
-                        onResetOnboarding = {
-                            onResetOnboarding()
-                        },
                         isIconSyncLoading = uiState.isIconSyncLoading,
                         iconSyncMessage = uiState.iconSyncMessage,
                         onManualSyncIcons = {
@@ -429,10 +413,7 @@ fun SettingsView(
                             viewModel.clearIconSyncMessage()
                         },
                         isConnected = uiState.isConnected,
-                        onRestartBleServer = {
-                            com.sameerasw.airsync.AirSyncApp.getBleConnectionManager()?.restartServer()
-                            Toast.makeText(context, "BLE GATT Server restarted", Toast.LENGTH_SHORT).show()
-                        }
+
                     )
                 }
             }
@@ -472,8 +453,17 @@ fun SettingsView(
                     }
                 }
 
+                val categoryTitle = when (activeCategory) {
+                    "App" -> stringResource(R.string.ui_app)
+                    "Notifications" -> stringResource(R.string.ui_notifications)
+                    "Clipboard" -> stringResource(R.string.ui_clipboard)
+                    "Media and Files" -> stringResource(R.string.ui_media_and_files)
+                    "Widget" -> stringResource(R.string.ui_widget)
+                    else -> activeCategory
+                }
+
                 Text(
-                    text = activeCategory,
+                    text = categoryTitle,
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 4.dp)
@@ -482,6 +472,26 @@ fun SettingsView(
                 RoundedCardContainer {
                     when (activeCategory) {
                         "App" -> {
+                            TransportModeCard(
+                                transportMode = uiState.transportMode,
+                                isConnected = uiState.isConnected,
+                                isConnecting = uiState.isConnecting,
+                                relayServerUrl = uiState.relayServerUrl,
+                                relayRoom = uiState.relayRoom,
+                                relaySecret = uiState.relaySecret,
+                                relayPinnedCertSha256 = uiState.relayPinnedCertSha256,
+                                encryptionKey = uiState.symmetricKey,
+                                errorMessage = uiState.relayError,
+                                onModeChange = { mode -> viewModel.setTransportMode(context, mode) },
+                                onServerUrlChange = { url -> viewModel.setRelayServerUrl(context, url) },
+                                onRoomChange = { r -> viewModel.setRelayRoom(context, r) },
+                                onSecretChange = { sec -> viewModel.setRelaySecret(context, sec) },
+                                onPinnedCertSha256Change = { pin -> viewModel.setRelayPinnedCertSha256(context, pin) },
+                                onEncryptionKeyChange = { key -> viewModel.updateSymmetricKey(key) },
+                                onSaveAndConnect = { viewModel.saveRelayAndConnect(context) },
+                                onDisconnect = { WebSocketUtil.disconnect(context) }
+                            )
+
                             DefaultTabCard(
                                 currentDefaultTab = uiState.defaultTab,
                                 onDefaultTabChange = { tab -> viewModel.setDefaultTab(tab) }
@@ -574,12 +584,15 @@ fun SettingsView(
                                     viewModel.setContinueBrowsingEnabled(enabled)
                                 },
                                 isContinueBrowsingToggleEnabled = true,
-                                continueBrowsingSubtitle = "Prompt to open shared links in browser",
+                                continueBrowsingSubtitle = stringResource(R.string.ui_prompt_to_open_shared_links_in_browser),
                                 isKeepPreviousLinkEnabled = uiState.isKeepPreviousLinkEnabled,
                                 onToggleKeepPreviousLink = { enabled: Boolean ->
                                     viewModel.setKeepPreviousLinkEnabled(enabled)
                                 }
                             )
+                            RootClipboardSettings(context, uiState.isClipboardSyncEnabled) {
+                                viewModel.refreshPermissions(context)
+                            }
                         }
                         "Media and Files" -> {
                             MediaSyncCard(
@@ -599,8 +612,8 @@ fun SettingsView(
                             )
 
                             IconToggleItem(
-                                title = "Quick Share",
-                                description = "Allow receiving files from nearby devices",
+                                title = stringResource(R.string.ui_quick_share),
+                                description = stringResource(R.string.ui_allow_receiving_files_from_nearby_devices),
                                 iconRes = R.drawable.quick_share,
                                 isChecked = uiState.isQuickShareEnabled,
                                 onCheckedChange = { enabled: Boolean ->
@@ -618,61 +631,9 @@ fun SettingsView(
                                 }
                             )
                         }
-                        "Integrations" -> {
-                            SmartspacerCard(
-                                isSmartspacerShowWhenDisconnected = uiState.isSmartspacerShowWhenDisconnected,
-                                onToggleSmartspacerShowWhenDisconnected = { enabled: Boolean ->
-                                    viewModel.setSmartspacerShowWhenDisconnected(enabled)
-                                }
-                            )
-
-                            val isEssentialsInstalled = try {
-                                context.packageManager.getPackageInfo("com.sameerasw.essentials", 0)
-                                true
-                            } catch (e: Exception) {
-                                false
-                            }
-
-                            if (isEssentialsInstalled) {
-                                IconToggleItem(
-                                    title = stringResource(R.string.connect_to_essentials),
-                                    description = stringResource(R.string.connect_to_essentials_summary),
-                                    iconRes = R.drawable.essentials_icon,
-                                    isChecked = uiState.isEssentialsConnectionEnabled,
-                                    onCheckedChange = { enabled: Boolean ->
-                                        viewModel.setEssentialsConnectionEnabled(enabled)
-                                    }
-                                )
-                            } else {
-                                ListItem(
-                                    colors = ListItemDefaults.colors(
-                                        containerColor = androidx.compose.ui.graphics.Color.Transparent
-                                    ),
-                                    headlineContent = { Text(stringResource(R.string.download_essentials)) },
-                                    supportingContent = {
-                                        Text(stringResource(R.string.download_essentials_summary))
-                                    },
-                                    trailingContent = {
-                                        Button(
-                                            onClick = {
-                                                HapticUtil.performClick(haptics)
-                                                val intent = android.content.Intent(
-                                                    android.content.Intent.ACTION_VIEW,
-                                                    android.net.Uri.parse("https://github.com/sameerasw/essentials/releases/latest")
-                                                )
-                                                intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                                                context.startActivity(intent)
-                                            }
-                                        ) {
-                                            Text("Download")
-                                        }
-                                    }
-                                )
-                            }
-                        }
                         "Widget" -> {
                             com.sameerasw.airsync.presentation.ui.components.sliders.ConfigSliderItem(
-                                title = "Widget Transparency",
+                                title = stringResource(R.string.ui_widget_transparency),
                                 value = uiState.widgetTransparency,
                                 onValueChange = { viewModel.setWidgetTransparency(it) }
                             )

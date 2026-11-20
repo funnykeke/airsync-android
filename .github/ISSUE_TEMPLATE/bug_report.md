@@ -1,31 +1,20 @@
 ---
-name: Bug report
-about: Create a report to help us improve
+name: 问题反馈
+about: 报告使用中遇到的 Bug 或异常行为
 title: "[Bug] "
 labels: bug
-assignees: sameerasw
+assignees: funnykeke
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+### 问题描述
+请简要描述遇到的问题。
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Tap on '....'
-3. Observe '....'
-4. See error
+### 复现步骤
+1. 连接模式（局域网 / 服务器中转）：
+2. 操作步骤：
+3. 预期结果 vs 实际结果：
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
-
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
-
-**Environment (please complete the following information):**
- - Device: [e.g. Pixel 6, Samsung Galaxy S22]
- - Android Version: [e.g. Android 13]
- - App Version: [e.g. 2.0.1]
-
-**Additional context**
-Add any other context about the problem here.
+### 环境信息
+- Android 版本与机型：
+- AirSync Android 版本：
+- macOS 版本与 AirSync Mac 版本：

@@ -1,6 +1,24 @@
 package com.sameerasw.airsync.utils
 
+import com.sameerasw.airsync.domain.model.AudioInfo
+import com.sameerasw.airsync.domain.model.BatteryInfo
+
 object JsonUtil {
+
+    /** Serialize the already captured snapshot; never query media again here. */
+    fun createDeviceStatusJson(battery: BatteryInfo, audio: AudioInfo, includeNowPlaying: Boolean): String {
+        // The preference may have changed after capture. Strip all media at
+        // serialization as well, retaining battery, volume and pairing status.
+        val media = if (includeNowPlaying) audio else AudioInfo(false, "", "", audio.volume, audio.isMuted)
+        return createDeviceStatusJson(
+            batteryLevel = battery.level, isCharging = battery.isCharging, isPaired = true,
+            isPlaying = media.isPlaying, title = media.title, artist = media.artist,
+            volume = audio.volume, isMuted = audio.isMuted, albumArt = media.albumArt,
+            albumArtLite = media.albumArtLite, duration = media.durationMs,
+            position = media.positionMs, positionTimestamp = media.positionTimestampMs,
+            isBuffering = media.isBuffering, likeStatus = media.likeStatus, playbackRate = media.playbackRate
+        )
+    }
 
     /**
      * Ensures JSON string is a single line by removing all newlines and extra whitespace
@@ -55,7 +73,6 @@ object JsonUtil {
         version: String,
         wallpaperBase64: String?,
         adbPorts: List<String>,
-        bleAuthToken: String? = null,
         targetIpAddress: String? = null
     ): String {
         val wallpaperJson = if (wallpaperBase64 != null) {
@@ -63,15 +80,10 @@ object JsonUtil {
         } else {
             ""
         }
-        val bleTokenJson = if (bleAuthToken != null) {
-            ""","bleAuthToken":"$bleAuthToken""""
-        } else {
-            ""
-        }
         val portsJson = adbPorts.joinToString(",") { "\"$it\"" }
         val targetIpJson =
             if (targetIpAddress != null) """, "targetIpAddress": "$targetIpAddress" """ else ""
-        return """{"type":"device","data":{"id":"$id","name":"${escape(name)}","ipAddress":"$ipAddress","port":$port,"version":"${escape(version)}","adbPorts":[$portsJson]$wallpaperJson$bleTokenJson$targetIpJson}}"""
+        return """{"type":"device","data":{"id":"$id","name":"${escape(name)}","ipAddress":"$ipAddress","port":$port,"version":"${escape(version)}","adbPorts":[$portsJson]$wallpaperJson$targetIpJson}}"""
     }
 
     /**
@@ -175,12 +187,13 @@ object JsonUtil {
         position: Long = 0L,
         positionTimestamp: Long = 0L,
         isBuffering: Boolean = false,
-        likeStatus: String
+        likeStatus: String,
+        playbackRate: Double = 1.0
     ): String {
         val albumArtJson = if (albumArt != null) ",\"albumArt\":\"$albumArt\"" else ""
         val albumArtLiteJson =
             if (albumArtLite != null) ",\"albumArtLite\":\"$albumArtLite\"" else ""
-        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"${escape(title)}","artist":"${escape(artist)}","volume":$volume,"isMuted":$isMuted$albumArtJson$albumArtLiteJson,"duration":$duration,"position":$position,"positionTimestamp":$positionTimestamp,"isBuffering":$isBuffering,"likeStatus":"$likeStatus"}}}"""
+        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"${escape(title)}","artist":"${escape(artist)}","volume":$volume,"isMuted":$isMuted$albumArtJson$albumArtLiteJson,"duration":$duration,"position":$position,"positionTimestamp":$positionTimestamp,"playbackRate":${if (playbackRate.isFinite()) playbackRate else 1.0},"isBuffering":$isBuffering,"likeStatus":"$likeStatus"}}}"""
     }
 
     /**
@@ -254,7 +267,7 @@ object JsonUtil {
      */
     fun createClipboardUpdateJson(text: String): String {
         // Escape quotes and newlines in the text
-        val escapedText = text.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r")
+        val escapedText = escape(text)
         return """{"type":"clipboardUpdate","data":{"text":"$escapedText"}}"""
     }
 

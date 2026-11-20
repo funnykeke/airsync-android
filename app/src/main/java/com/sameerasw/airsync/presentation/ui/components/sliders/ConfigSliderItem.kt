@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.presentation.ui.components.sliders
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -86,7 +87,7 @@ fun ConfigSliderItem(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.rounded_remove_24),
-                    contentDescription = "Decrease",
+                    contentDescription = stringResource(R.string.ui_decrease),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -124,7 +125,7 @@ fun ConfigSliderItem(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.rounded_add_24),
-                    contentDescription = "Increase",
+                    contentDescription = stringResource(R.string.ui_increase),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

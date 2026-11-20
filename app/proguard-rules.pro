@@ -35,3 +35,7 @@
 -dontwarn java.lang.management.ManagementFactory
 -dontwarn java.lang.management.RuntimeMXBean
 -dontwarn org.slf4j.impl.StaticLoggerBinder
+
+# Entrypoint loaded by app_process after explicit Root opt-in.
+-keep class com.sameerasw.airsync.clipboard.RootClipboardReader { *; }
+-keep class com.sameerasw.airsync.clipboard.RootClipboardReader$* { *; }

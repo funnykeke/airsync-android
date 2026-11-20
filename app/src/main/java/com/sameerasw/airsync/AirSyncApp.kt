@@ -8,14 +8,11 @@ import com.sameerasw.airsync.crash.CrashNotificationHelper
 
 class AirSyncApp : Application() {
     private var activityCount = 0
-    private lateinit var bleConnectionManager: com.sameerasw.airsync.data.ble.BleConnectionManager
 
     companion object {
         private var instance: AirSyncApp? = null
         fun getContext(): Application? = instance
         fun isAppForeground(): Boolean = instance?.isForeground() ?: false
-        fun getBleConnectionManager(): com.sameerasw.airsync.data.ble.BleConnectionManager? =
-            instance?.bleConnectionManager
     }
 
     override fun onCreate() {
@@ -24,8 +21,6 @@ class AirSyncApp : Application() {
 
         CrashNotificationHelper.createChannel(this)
 
-        bleConnectionManager = com.sameerasw.airsync.data.ble.BleConnectionManager(this)
-        bleConnectionManager.start()
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
             override fun onActivityStarted(activity: Activity) {

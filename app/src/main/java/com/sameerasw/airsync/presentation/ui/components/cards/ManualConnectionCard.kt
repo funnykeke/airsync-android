@@ -36,7 +36,6 @@ fun ManualConnectionCard(
     onIpChange: (String) -> Unit,
     onPortChange: (String) -> Unit,
     onPcNameChange: (String) -> Unit,
-    onIsPlusChange: (Boolean) -> Unit,
     onSymmetricKeyChange: (String) -> Unit,
     onConnect: () -> Unit,
     onQrScanClick: (() -> Unit)? = null,
@@ -103,19 +102,6 @@ fun ManualConnectionCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.label_airsync_plus), color = MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.weight(1f))
-                Switch(
-                    checked = uiState.manualIsPlus,
-                    onCheckedChange = { enabled ->
-                        if (enabled) HapticUtil.performToggleOn(haptics) else HapticUtil.performToggleOff(
-                            haptics
-                        )
-                        onIsPlusChange(enabled)
-                    }
-                )
-            }
             Button(
                 onClick = {
                     HapticUtil.performClick(haptics)

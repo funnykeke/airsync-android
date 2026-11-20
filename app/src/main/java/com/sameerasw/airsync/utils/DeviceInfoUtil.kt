@@ -15,6 +15,8 @@ import android.util.Log
 import com.sameerasw.airsync.domain.model.AudioInfo
 import com.sameerasw.airsync.domain.model.BatteryInfo
 import com.sameerasw.airsync.service.MediaNotificationListener
+import com.sameerasw.airsync.data.local.DataStoreManager
+import kotlinx.coroutines.flow.first
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Collections
@@ -177,7 +179,8 @@ object DeviceInfoUtil {
                 positionMs = mediaInfo.positionMs,
                 positionTimestampMs = mediaInfo.positionTimestampMs,
                 isBuffering = mediaInfo.isBuffering,
-                likeStatus = mediaInfo.likeStatus
+                likeStatus = mediaInfo.likeStatus,
+                playbackRate = mediaInfo.playbackRate
             )
         } catch (e: Exception) {
             Log.e("DeviceInfoUtil", "Error getting audio info: ${e.message}")
@@ -185,27 +188,13 @@ object DeviceInfoUtil {
         }
     }
 
-    fun generateDeviceStatusJson(context: Context): String {
+    suspend fun generateDeviceStatusJson(context: Context): String {
+        val includeNowPlaying = DataStoreManager(context).getSendNowPlayingEnabled().first()
         val batteryInfo = getBatteryInfo(context)
-        val audioInfo = getAudioInfo(context)
+        val audioInfo = getAudioInfo(context, includeNowPlaying)
 
-        return JsonUtil.createDeviceStatusJson(
-            batteryLevel = batteryInfo.level,
-            isCharging = batteryInfo.isCharging,
-            isPaired = true,
-            isPlaying = audioInfo.isPlaying,
-            title = audioInfo.title,
-            artist = audioInfo.artist,
-            volume = audioInfo.volume,
-            isMuted = audioInfo.isMuted,
-            albumArt = audioInfo.albumArt,
-            albumArtLite = audioInfo.albumArtLite,
-            duration = audioInfo.durationMs,
-            position = audioInfo.positionMs,
-            positionTimestamp = audioInfo.positionTimestampMs,
-            isBuffering = audioInfo.isBuffering,
-            likeStatus = audioInfo.likeStatus
-        )
+        return JsonUtil.createDeviceStatusJson(batteryInfo, audioInfo,
+            includeNowPlaying && DataStoreManager(context).getSendNowPlayingEnabled().first())
     }
 
     fun isBlurProblematicDevice(): Boolean {

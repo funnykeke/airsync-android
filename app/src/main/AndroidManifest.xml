@@ -5,7 +5,6 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.BATTERY_STATS" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -13,44 +12,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
-
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-
-    <uses-feature
-        android:name="android.hardware.bluetooth_le"
-        android:required="false" />
-
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_WALLPAPER_INTERNAL" />
-
-
-    <!-- Permission for downloading updates -->
-    <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
-
-    <!-- Notes Role permission for content capture in floating windows -->
-    <uses-permission android:name="android.permission.LAUNCH_CAPTURE_CONTENT_ACTIVITY_FOR_NOTE" />
-
-    <!-- Media playback control  -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Camera permission for QR code scanner -->
     <uses-permission android:name="android.permission.CAMERA" />
 
     <!-- mDNS discovery for ADB wireless ports -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
-
-    <!-- Call handling permissions -->
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
-
-    <uses-permission android:name="com.sameerasw.permission.ESSENTIALS_AIRSYNC_BRIDGE" />
 
     <application
         android:name=".AirSyncApp"
@@ -65,24 +34,15 @@
         android:theme="@style/Theme.AirSync"
         tools:targetApi="36">
 
-
-
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.AirSync.Splash">
-            <!-- Main launcher intent filter -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-
-            <!-- Notes Role intent filter - responds to CREATE_NOTE action -->
-            <intent-filter>
-                <action android:name="android.intent.action.CREATE_NOTE" />
-                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
             <!-- Deep link intent filter for QR codes -->
@@ -104,15 +64,13 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-
         <activity
             android:name=".presentation.ui.activities.ClipboardActionActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:noHistory="true"
             android:taskAffinity=""
-            android:theme="@style/Theme.AirSync.Transparent">
-        </activity>
+            android:theme="@style/Theme.AirSync.Transparent" />
 
         <activity
             android:name=".presentation.ui.activities.ClipboardGhostActivity"
@@ -163,7 +121,6 @@
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.AirSync">
-            <!-- Allow external apps to launch the scanner -->
             <intent-filter>
                 <action android:name="com.sameerasw.airsync.SCAN_QR" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -174,16 +131,13 @@
         <activity
             android:name=".presentation.ui.activities.PermissionsActivity"
             android:exported="false"
-            android:label="Permissions"
+            android:label="@string/title_permissions"
             android:theme="@style/Theme.AirSync" />
-
-
-
 
         <service
             android:name=".service.MacMediaPlayerService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice"></service>
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Quick Settings Tile Service -->
         <service
@@ -216,57 +170,28 @@
             android:name=".service.ClipboardTileService"
             android:exported="true"
             android:icon="@drawable/ic_clipboard_24"
-            android:label="Send Clipboard"
+            android:label="@string/label_clipboard_tile"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
 
-
-        <!-- Wake-up Service for receiving reconnection requests from Mac -->
+        <!-- Wake-up Service for receiving local reconnection requests from Mac -->
         <service
             android:name=".service.WakeupService"
             android:exported="false" />
 
-        <!-- AirSync Service - maintains connection to Mac and handles call monitoring -->
+        <!-- AirSync Service - maintains connection to Mac -->
         <service
             android:name=".service.AirSyncService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
         <service
-            android:name=".island.AirSyncIslandService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.sameerasw.island.PROVIDER" />
-            </intent-filter>
-            <meta-data
-                android:name="com.sameerasw.island.provider.label"
-                android:value="@string/island_provider_label" />
-            <meta-data
-                android:name="com.sameerasw.island.provider.description"
-                android:value="@string/island_provider_description" />
-            <meta-data
-                android:name="com.sameerasw.island.provider.priority"
-                android:value="58" />
-        </service>
-
-        <service
             android:name=".quickshare.QuickShareService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
-
-        <!-- Call Receiver - listens for telephony events -->
-        <receiver
-            android:name=".service.CallReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.PHONE_STATE" />
-                <action android:name="android.intent.action.NEW_OUTGOING_CALL" />
-            </intent-filter>
-        </receiver>
 
         <!-- Widget Provider -->
         <receiver
@@ -281,43 +206,11 @@
                 android:resource="@xml/widget_airsync_info" />
         </receiver>
 
-
         <receiver
             android:name=".service.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <!-- Continue Browsing actions -->
                 <action android:name="com.sameerasw.airsync.CONTINUE_BROWSING_DISMISS" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Smartspacer Target Provider -->
-        <provider
-            android:name=".smartspacer.AirSyncDeviceTarget"
-            android:authorities="${applicationId}.target.airsync_device"
-            android:exported="true"
-            android:permission="com.kieronquinn.app.smartspacer.permission.ACCESS_SMARTSPACER_TARGETS">
-            <intent-filter>
-                <action android:name="com.kieronquinn.app.smartspacer.TARGET" />
-            </intent-filter>
-        </provider>
-
-        <!-- Smartspacer Target Update Receiver -->
-        <receiver
-            android:name=".smartspacer.AirSyncTargetUpdateReceiver"
-            android:exported="true"
-            android:permission="com.kieronquinn.app.smartspacer.permission.SEND_UPDATE_BROADCAST">
-            <intent-filter>
-                <action android:name="com.kieronquinn.app.smartspacer.REQUEST_TARGET_UPDATE" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".utils.EssentialsRequestReceiver"
-            android:exported="true"
-            android:permission="com.sameerasw.permission.ESSENTIALS_AIRSYNC_BRIDGE">
-            <intent-filter>
-                <action android:name="com.sameerasw.airsync.action.REQUEST_MAC_BATTERY" />
             </intent-filter>
         </receiver>
 
@@ -340,16 +233,12 @@
 
     </application>
 
-
     <queries>
         <!-- To see launchable apps -->
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
-
-        <package android:name="com.google.ar.lens" />
-        <package android:name="com.sameerasw.essentials" />
     </queries>
 
 </manifest>

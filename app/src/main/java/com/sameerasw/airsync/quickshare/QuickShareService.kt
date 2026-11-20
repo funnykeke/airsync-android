@@ -66,11 +66,11 @@ class QuickShareService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
-                createNotification("Quick Share is active"),
+                createNotification(getString(R.string.quickshare_active)),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             )
         } else {
-            startForeground(NOTIFICATION_ID, createNotification("Quick Share is active"))
+            startForeground(NOTIFICATION_ID, createNotification(getString(R.string.quickshare_active)))
         }
 
         server = QuickShareServer(this) { connection ->
@@ -81,7 +81,7 @@ class QuickShareService : Service() {
                 discoveryJob?.cancel() // Transfer started, abort timeout
                 val pin = conn.ukey2Context?.authString ?: ""
                 Log.d(TAG, "Connection ready, PIN: $pin")
-                updateForegroundNotification("PIN: $pin - Waiting for files...")
+                updateForegroundNotification(getString(R.string.quickshare_pin_waiting, pin))
 
                 var lastUpdate = 0L
                 conn.onFileProgress =
@@ -116,9 +116,9 @@ class QuickShareService : Service() {
                                         (totalSize - bytesTransferred).coerceAtLeast(0)
                                     val secondsRemaining = (remainingBytes / newSpeed).toLong()
                                     etaString = if (secondsRemaining < 60) {
-                                        "$secondsRemaining sec remaining"
+                                        getString(R.string.quickshare_eta_sec, secondsRemaining)
                                     } else {
-                                        "${secondsRemaining / 60} min remaining"
+                                        getString(R.string.quickshare_eta_min, secondsRemaining / 60)
                                     }
                                 }
                             }
@@ -131,7 +131,7 @@ class QuickShareService : Service() {
                                 percent,
                                 transferId,
                                 isSending = false,
-                                etaString = etaString ?: state.lastEtaString ?: "Calculating..."
+                                etaString = etaString ?: state.lastEtaString ?: getString(R.string.quickshare_eta_calculating)
                             )
                             if (etaString != null) {
                                 state.lastEtaString = etaString
@@ -153,11 +153,11 @@ class QuickShareService : Service() {
             }
 
             connection.onIntroductionReceived = { intro ->
-                val deviceName = connection.endpointName ?: "Unknown Device"
-                val firstFileName = intro.file_metadata.firstOrNull()?.name ?: "Unknown File"
+                val deviceName = connection.endpointName ?: getString(R.string.quickshare_unknown_device)
+                val firstFileName = intro.file_metadata.firstOrNull()?.name ?: getString(R.string.quickshare_unknown_file)
                 val fileCount = intro.file_metadata.size
                 val displayText =
-                    if (fileCount > 1) "$firstFileName and ${fileCount - 1} more" else firstFileName
+                    if (fileCount > 1) getString(R.string.quickshare_more_files, firstFileName, fileCount) else firstFileName
 
                 serviceScope.launch {
                     val pairedDevice = dataStoreManager.getLastConnectedDevice().first()
@@ -211,7 +211,7 @@ class QuickShareService : Service() {
 
             ACTION_START_DISCOVERY -> {
                 serviceScope.launch {
-                    val enabled = dataStoreManager.isQuickShareEnabled().first()
+                    val enabled = dataStoreManager.isQuickShareEnabled().first() && dataStoreManager.getTransportMode().first() == "local"
                     if (enabled) {
                         startDiscoveryWithTimeout()
                     } else {
@@ -238,7 +238,7 @@ class QuickShareService : Service() {
 
             else -> {
                 serviceScope.launch {
-                    val enabled = dataStoreManager.isQuickShareEnabled().first()
+                    val enabled = dataStoreManager.isQuickShareEnabled().first() && dataStoreManager.getTransportMode().first() == "local"
                     if (enabled) {
                         server.start()
                     } else {
@@ -257,11 +257,11 @@ class QuickShareService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 NOTIFICATION_ID,
-                createNotification("Searching for files..."),
+                createNotification(getString(R.string.quickshare_searching)),
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
             )
         } else {
-            startForeground(NOTIFICATION_ID, createNotification("Searching for files..."))
+            startForeground(NOTIFICATION_ID, createNotification(getString(R.string.quickshare_searching)))
         }
 
         server.start()
@@ -276,7 +276,7 @@ class QuickShareService : Service() {
             val deviceName = persistedName ?: Build.MODEL
             Log.d(TAG, "Starting discovery with name: $deviceName")
             advertiser.startAdvertising(deviceName, port)
-            updateForegroundNotification("Quick Share is visible for 60s...")
+            updateForegroundNotification(getString(R.string.quickshare_visible_60s))
 
             kotlinx.coroutines.delay(60_000) // 1 minute timeout
 
@@ -298,7 +298,7 @@ class QuickShareService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } else {
-            updateForegroundNotification("Active transfer in progress...")
+            updateForegroundNotification(getString(R.string.quickshare_transfer_in_progress))
         }
     }
 
@@ -306,7 +306,7 @@ class QuickShareService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Quick Share",
+                getString(R.string.quickshare_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -321,7 +321,7 @@ class QuickShareService : Service() {
 
     private fun createNotification(content: String): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Quick Share")
+            .setContentTitle(getString(R.string.quickshare_channel_name))
             .setContentText(content)
             .setSmallIcon(R.drawable.ic_laptop_24)
             .setOngoing(true)
@@ -353,11 +353,11 @@ class QuickShareService : Service() {
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Quick Share from $deviceName")
-            .setContentText("Wants to send: $fileName")
+            .setContentTitle(getString(R.string.quickshare_from_device, deviceName))
+            .setContentText(getString(R.string.notif_wants_to_send, fileName))
             .setSmallIcon(R.drawable.ic_laptop_24)
-            .addAction(0, "Accept", acceptPendingIntent)
-            .addAction(0, "Reject", rejectPendingIntent)
+            .addAction(0, getString(R.string.quickshare_accept), acceptPendingIntent)
+            .addAction(0, getString(R.string.quickshare_reject), rejectPendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(Notification.DEFAULT_ALL)
             .build()

@@ -1,5 +1,6 @@
 package com.sameerasw.airsync.utils
 
+import com.sameerasw.airsync.R
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
@@ -16,7 +17,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object SyncManager {
     private const val TAG = "SyncManager"
-    private const val BATTERY_SYNC_INTERVAL = 10_000L // 10 seconds
+    // 自用版本：从 10 秒放宽到 30 秒，减少唤醒次数
+    private const val BATTERY_SYNC_INTERVAL = 30_000L // 30 seconds
     private const val MAX_DAILY_ICON_SYNCS = 3
 
     private var syncJob: Job? = null
@@ -24,6 +26,7 @@ object SyncManager {
     private var lastBatteryInfo: BatteryInfo? = null
     private var lastVolume: Int = -1
     private val isSyncing = AtomicBoolean(false)
+    private val iconSyncInProgress = AtomicBoolean(false)
 
     // Track skip suppression mechanism
     @Volatile
@@ -42,17 +45,9 @@ object SyncManager {
 
             while (isActive && isSyncing.get()) {
                 try {
-                    // Heartbeat: Sync battery over BLE if authenticated and WS not connected to keep Mac connection alive
-                    if (com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated() && !WebSocketUtil.isConnected()) {
-                        val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
-                        com.sameerasw.airsync.data.ble.BleTransportBridge.sendBatteryStatus(
-                            currentBattery
-                        )
-                    }
 
-                    // Check if sync is needed (either via WebSocket or BLE)
-                    if (WebSocketUtil.isConnected() || com.sameerasw.airsync.data.ble.BleGattServer.isAnyAuthenticated()) {
-                        val dataStoreManager = DataStoreManager(context)
+                    if (WebSocketUtil.isConnected()) {
+                        val dataStoreManager = DataStoreManager.getInstance(context)
                         val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
 
                         if (isSyncEnabled) {
@@ -85,7 +80,7 @@ object SyncManager {
         }
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val dataStoreManager = DataStoreManager(context)
+                val dataStoreManager = DataStoreManager.getInstance(context)
                 val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
 
                 val currentAudio = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
@@ -101,6 +96,7 @@ object SyncManager {
                         last.volume != currentAudio.volume ||
                         last.isMuted != currentAudio.isMuted ||
                         last.isBuffering != currentAudio.isBuffering ||
+                        last.playbackRate != currentAudio.playbackRate ||
                         last.durationMs != currentAudio.durationMs ||
                         kotlin.math.abs(last.positionMs - currentAudio.positionMs) >= 5_000L ||
                         last.likeStatus != currentAudio.likeStatus
@@ -125,8 +121,8 @@ object SyncManager {
                 }
 
                 if (shouldSync) {
-                    val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
-                    // sendMessage handles both WebSocket and BLE fallback internally
+                    val statusJson = JsonUtil.createDeviceStatusJson(currentBattery, currentAudio,
+                        includeNowPlaying && dataStoreManager.getSendNowPlayingEnabled().first())
                     val success = WebSocketUtil.sendMessage(statusJson)
 
                     if (success) {
@@ -134,7 +130,7 @@ object SyncManager {
                         lastBatteryInfo = currentBattery
                         lastVolume = currentAudio.volume
                     } else {
-                        Log.w(TAG, "Failed to sync device status (WS/BLE)")
+                        Log.w(TAG, "Failed to sync device status (WebSocket)")
                     }
                 }
 
@@ -149,16 +145,19 @@ object SyncManager {
             Log.d(TAG, "Performing initial sync sequence")
 
             try {
-                val dataStoreManager = DataStoreManager(context)
+                val dataStoreManager = DataStoreManager.getInstance(context)
+                val isRelay = WebSocketUtil.isRelayMode()
 
-                // 1. Ensure ADB discovery is running (started at app startup)
-                try {
-                    val activity = context as? com.sameerasw.airsync.MainActivity
-                    activity?.initializeAdbDiscovery()
-                    Log.d(TAG, "ADB discovery is running")
-                    delay(1000)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not access ADB discovery: ${e.message}")
+                // 1. Ensure ADB discovery is running only in local mode
+                if (!isRelay) {
+                    try {
+                        val activity = context as? com.sameerasw.airsync.MainActivity
+                        activity?.initializeAdbDiscovery()
+                        Log.d(TAG, "ADB discovery is running")
+                        delay(1000)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not access ADB discovery: ${e.message}")
+                    }
                 }
 
                 // 2. Send lightweight device info immediately (no wallpaper) to trigger macInfo
@@ -175,26 +174,15 @@ object SyncManager {
                     }
                 Log.d(TAG, "Using device name for sync: $deviceName")
 
-                val localIp = DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown"
+                val localIp = if (isRelay) "" else (DeviceInfoUtil.getWifiIpAddress(context) ?: "Unknown")
                 val port = dataStoreManager.getPort().first().toIntOrNull() ?: 6996
                 val version = context.packageManager
-                    .getPackageInfo(context.packageName, 0).versionName ?: "3.0.0"
+                    .getPackageInfo(context.packageName, 0).versionName ?: "4.3.0"
 
-                // Get discovered ADB ports from the running mDNS discovery
-                val adbPorts = try {
-                    // Access the discovery holder directly - it's a true singleton object
+                // Get discovered ADB ports only in local mode
+                val adbPorts = if (isRelay) emptyList() else try {
                     val discoveredServices =
                         com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
-                    Log.d(
-                        TAG,
-                        "Retrieved ${discoveredServices.size} discovered ADB services from holder"
-                    )
-                    discoveredServices.forEach { service ->
-                        Log.d(
-                            TAG,
-                            "  - Service: ${service.serviceName} at ${service.hostAddress}:${service.port}"
-                        )
-                    }
                     discoveredServices.map { it.port.toString() }
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to get ADB ports: ${e.message}")
@@ -203,11 +191,6 @@ object SyncManager {
                 Log.d(TAG, "Discovered ADB ports: $adbPorts")
 
                 val deviceId = DeviceInfoUtil.getDeviceId(context)
-                val symmetricKey =
-                    dataStoreManager.getLastConnectedDevice().first()?.symmetricKey ?: ""
-                val bleAuthToken =
-                    com.sameerasw.airsync.data.ble.BleTransportBridge.deriveAuthToken(symmetricKey)
-
                 val liteDeviceInfoJson = JsonUtil.createDeviceInfoJson(
                     id = deviceId,
                     name = deviceName,
@@ -216,49 +199,49 @@ object SyncManager {
                     version = version,
                     wallpaperBase64 = null,
                     adbPorts = adbPorts,
-                    bleAuthToken = bleAuthToken,
                     targetIpAddress = WebSocketUtil.currentIpAddress
                 )
                 if (WebSocketUtil.sendMessage(liteDeviceInfoJson)) {
-                    Log.d(TAG, "Lite device info sent to trigger macInfo (BLE token included)")
+                    Log.d(TAG, "Lite device info sent to trigger macInfo")
                 } else {
                     Log.e(TAG, "Failed to send lite device info")
                 }
 
-                // Optionally send full device info with wallpaper a bit later, but don't block handshake
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        delay(1500)
-                        val wallpaperBase64 = try {
-                            WallpaperUtil.getWallpaperAsBase64(context)
-                        } catch (_: Exception) {
-                            null
-                        }
-                        val discoveredServices = try {
-                            com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
-                        val currentAdbPorts = discoveredServices.map { it.port.toString() }
-                        val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(
-                            id = deviceId,
-                            name = deviceName,
-                            ipAddress = localIp,
-                            port = port,
-                            version = version,
-                            wallpaperBase64 = wallpaperBase64,
-                            adbPorts = currentAdbPorts,
-                            bleAuthToken = bleAuthToken,
-                            targetIpAddress = WebSocketUtil.currentIpAddress
-                        )
-                        if (WebSocketUtil.sendMessage(fullDeviceInfoJson)) {
-                            Log.d(
-                                TAG,
-                                "Full device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}"
+                // In local mode, send full device info with wallpaper a bit later without blocking handshake
+                if (!isRelay) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            delay(1500)
+                            val wallpaperBase64 = try {
+                                WallpaperUtil.getWallpaperAsBase64(context)
+                            } catch (_: Exception) {
+                                null
+                            }
+                            val discoveredServices = try {
+                                com.sameerasw.airsync.AdbDiscoveryHolder.getDiscoveredServices()
+                            } catch (e: Exception) {
+                                emptyList()
+                            }
+                            val currentAdbPorts = discoveredServices.map { it.port.toString() }
+                            val fullDeviceInfoJson = JsonUtil.createDeviceInfoJson(
+                                id = deviceId,
+                                name = deviceName,
+                                ipAddress = localIp,
+                                port = port,
+                                version = version,
+                                wallpaperBase64 = wallpaperBase64,
+                                adbPorts = currentAdbPorts,
+                                targetIpAddress = WebSocketUtil.currentIpAddress
                             )
+                            if (WebSocketUtil.sendMessage(fullDeviceInfoJson)) {
+                                Log.d(
+                                    TAG,
+                                    "Full device info sent with wallpaper: ${if (wallpaperBase64 != null) "included" else "not available"}"
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to send full device info later: ${e.message}")
                         }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to send full device info later: ${e.message}")
                     }
                 }
 
@@ -266,12 +249,15 @@ object SyncManager {
 
                 // 2. Send device status (respect now playing setting)
                 val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
-                val statusJson = DeviceInfoUtil.generateDeviceStatusJson(context)
+                val audio = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
+                val battery = DeviceInfoUtil.getBatteryInfo(context)
+                val statusJson = JsonUtil.createDeviceStatusJson(battery, audio,
+                    includeNowPlaying && dataStoreManager.getSendNowPlayingEnabled().first())
                 if (WebSocketUtil.sendMessage(statusJson)) {
                     Log.d(TAG, "Device status sent")
                     // Update cache
-                    lastAudioInfo = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
-                    lastBatteryInfo = DeviceInfoUtil.getBatteryInfo(context)
+                    lastAudioInfo = audio
+                    lastBatteryInfo = battery
                 } else {
                     Log.e(TAG, "Failed to send device status")
                 }
@@ -316,7 +302,7 @@ object SyncManager {
                     emptyList()
                 }
 
-                val wallpaperBase64 = try {
+                val wallpaperBase64 = if (WebSocketUtil.isRelayMode()) null else try {
                     WallpaperUtil.getWallpaperAsBase64(context)
                 } catch (_: Exception) {
                     null
@@ -349,7 +335,7 @@ object SyncManager {
      */
     private suspend fun shouldSyncIconsAutomatically(context: Context): Boolean {
         try {
-            val dataStoreManager = DataStoreManager(context)
+            val dataStoreManager = DataStoreManager.getInstance(context)
             val lastDevice = dataStoreManager.getLastConnectedDevice().first()
 
             if (lastDevice == null) return true // First connection always syncs
@@ -382,7 +368,7 @@ object SyncManager {
      */
     private suspend fun updateIconSyncCounter(context: Context) {
         try {
-            val dataStoreManager = DataStoreManager(context)
+            val dataStoreManager = DataStoreManager.getInstance(context)
             val lastDevice = dataStoreManager.getLastConnectedDevice().first()
 
             if (lastDevice != null) {
@@ -436,14 +422,14 @@ object SyncManager {
         try {
             Log.d(TAG, "Starting app icons sync (manual: $isManualSync)")
 
-            val dataStoreManager = DataStoreManager(context)
+            val dataStoreManager = DataStoreManager.getInstance(context)
 
             // Get ALL installed apps first
             val installedApps = AppUtil.getInstalledApps(context)
             Log.d(TAG, "Found ${installedApps.size} installed apps")
 
             if (installedApps.isEmpty()) {
-                val message = "No installed apps found"
+                val message = context.getString(R.string.ui_no_installed_apps_found)
                 Log.w(TAG, message)
                 onResult?.invoke(false, message)
                 return
@@ -471,9 +457,9 @@ object SyncManager {
 
             if (iconMap.isNotEmpty()) {
                 // Create and send app icons JSON
-                val appIconsJson = JsonUtil.createAppIconsJson(allApps, iconMap)
+                val batches = allApps.chunked(8)
 
-                if (WebSocketUtil.sendMessage(appIconsJson)) {
+                if (batches.all { batch -> WebSocketUtil.sendMessage(JsonUtil.createAppIconsJson(batch, iconMap)) }) {
                     Log.d(
                         TAG,
                         "✅ App icons sent successfully (${iconMap.size} icons with full app details)"
@@ -484,14 +470,14 @@ object SyncManager {
                         updateIconSyncCounter(context)
                     }
 
-                    val message = "Successfully synced ${iconMap.size} app icons with details"
+                    val message = context.getString(R.string.sync_icons_success, iconMap.size)
                     onResult?.invoke(true, message)
                 } else {
                     Log.e(TAG, "Failed to send app icons")
-                    onResult?.invoke(false, "Failed to send app icons")
+                    onResult?.invoke(false, context.getString(R.string.sync_icons_failed))
                 }
             } else {
-                val message = "No app icons could be collected"
+                val message = context.getString(R.string.ui_no_app_icons_could_be_collected)
                 Log.w(TAG, message)
                 onResult?.invoke(false, message)
             }
@@ -510,6 +496,7 @@ object SyncManager {
         packageNames: List<String>,
         fetchIcons: Boolean = true
     ) {
+        if (!iconSyncInProgress.compareAndSet(false, true)) return
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (!WebSocketUtil.isConnected()) {
@@ -537,8 +524,8 @@ object SyncManager {
                             (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0 ||
                                     (ai.flags and android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
 
-                        // Use saved preference if available, default to true
-                        val isEnabled = savedAppsMap[pkg]?.isEnabled ?: true
+                        // App metadata must reflect the same explicit selection as notification delivery.
+                        val isEnabled = savedAppsMap[pkg]?.isEnabled ?: false
 
                         apps.add(
                             com.sameerasw.airsync.domain.model.NotificationApp(
@@ -562,6 +549,17 @@ object SyncManager {
                     return@launch
                 }
 
+                // A complete package snapshot precedes the icon batches. Each icon frame
+                // contains only eight apps, so it cannot be used to remove stale entries.
+                val allPackages = org.json.JSONArray()
+                apps.forEach { allPackages.put(it.packageName) }
+                val snapshot = org.json.JSONObject().put("type", "appList")
+                    .put("data", org.json.JSONObject().put("packages", allPackages))
+                if (!WebSocketUtil.sendMessage(snapshot.toString())) {
+                    Log.e(TAG, "Failed to send app list snapshot")
+                    return@launch
+                }
+
                 // Extract icons only if requested
                 val iconMap = if (fetchIcons) {
                     AppIconUtil.getAppIconsAsBase64(context, apps.map { it.packageName })
@@ -571,13 +569,10 @@ object SyncManager {
                 }
 
                 // If verifying icons, we need them. But for metadata sync, empty map is fine.
-                if (fetchIcons && iconMap.isEmpty()) {
-                    Log.w(TAG, "Icon extraction returned empty for optimized sync")
-                    return@launch
-                }
+                if (fetchIcons && iconMap.isEmpty()) Log.w(TAG, "Icon extraction returned empty; sending app names without icons")
 
-                val appIconsJson = JsonUtil.createAppIconsJson(apps, iconMap)
-                if (WebSocketUtil.sendMessage(appIconsJson)) {
+                val batches = apps.chunked(8)
+                if (batches.all { batch -> WebSocketUtil.sendMessage(JsonUtil.createAppIconsJson(batch, iconMap)) }) {
                     Log.d(
                         TAG,
                         "✅ Optimized app icons sent: ${apps.size} apps (icons included: $fetchIcons)"
@@ -587,6 +582,8 @@ object SyncManager {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in sendOptimizedAppIcons: ${e.message}")
+            } finally {
+                iconSyncInProgress.set(false)
             }
         }
     }

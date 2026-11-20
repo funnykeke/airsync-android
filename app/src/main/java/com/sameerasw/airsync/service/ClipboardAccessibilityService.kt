@@ -16,6 +16,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.presentation.ui.activities.ClipboardGhostActivity
 import com.sameerasw.airsync.utils.WebSocketUtil
+import com.sameerasw.airsync.utils.ClipboardSyncManager
 
 class ClipboardAccessibilityService : AccessibilityService() {
 
@@ -40,6 +41,7 @@ class ClipboardAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        if (ClipboardSyncManager.isRootSelected) return
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName || isGameApp(pkg)) return
         if (!WebSocketUtil.isConnected()) return

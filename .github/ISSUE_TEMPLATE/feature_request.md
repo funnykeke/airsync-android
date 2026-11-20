@@ -1,19 +1,13 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
-title: "[Feature] "
+name: 功能建议
+about: 提出省电优化、本地化或功能改进建议
+title: "[建议] "
 labels: enhancement
-assignees: sameerasw
+assignees: funnykeke
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+### 建议内容
+请清晰描述希望新增或改进的功能。
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
-
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
-
-**Additional context**
-Add any other context or screenshots about the feature request here.
+### 使用场景
+说明该改动如何提升体验或降低功耗。

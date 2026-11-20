@@ -1,24 +1,18 @@
-# Contributing to AirSync Android (3.0)
+# 参与贡献
 
-Thank you for your interest in contributing!  
-Before you submit a pull request, please read the following guidelines.
+欢迎通过 GitHub Issue 或 Pull Request 反馈问题与改进建议。
 
-## Licensing
+## 提交规范
 
-By contributing code, documentation, or any other materials, you agree that your contributions will be licensed under the:
+- 请保持代码简洁，避免引入高耗电的后台常驻任务或不必要的第三方依赖。
+- 切勿在代码中提交任何个人服务器 IP、域名、密钥、自签证书或签名 keystore。
+- 新增用户可见文本请同时补充 `app/src/main/res/values/strings.xml` 与 `app/src/main/res/values-zh/strings.xml`。
+- 提交前请运行：
 
-- Mozilla Public License 2.0
-- Plus the Additional Non-Commercial Use Clause defined in the LICENSE file
+```bash
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+```
 
-This ensures that the project remains open for personal use but protected against unauthorized commercial redistribution.
+## 协议说明
 
-## Guidelines
-
-- Make pull requests to the `main` or `dev` branch.
-- Include clear commit messages.
-- Respect project structure and coding standards.
-- If you're submitting a new feature, consider opening an issue to discuss it first.
-
-## Contact
-
-For questions about contributions or licensing, contact: sameerasw.com@gmail.com
+所有贡献将遵循本仓库 [LICENSE](LICENSE) 中的 MPL-2.0 协议及附加条款。

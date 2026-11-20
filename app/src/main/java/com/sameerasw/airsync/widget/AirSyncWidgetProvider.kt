@@ -95,11 +95,16 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.widget_airsync)
 
         try {
-            val ds = DataStoreManager(context)
+            val ds = DataStoreManager.getInstance(context)
             val isConnected = WebSocketUtil.isConnected()
             val isConnecting = WebSocketUtil.isConnecting()
-            val lastDevice = runBlocking { ds.getLastConnectedDevice().first() }
-            val widgetAlpha = runBlocking { ds.getWidgetTransparency().first() }
+            val (lastDevice, widgetAlpha, macStatus) = runBlocking {
+                Triple(
+                    ds.getLastConnectedDevice().first(),
+                    ds.getWidgetTransparency().first(),
+                    ds.getMacStatusForWidget().first()
+                )
+            }
 
             // Apply background transparency
             val baseBg =
@@ -125,11 +130,7 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             // Apply both view alpha and image alpha for broader device compatibility
             views.setFloat(R.id.widget_device_image, "setAlpha", alphaFloat)
             views.setInt(R.id.widget_device_image, "setImageAlpha", alphaInt)
-            views.setTextViewText(R.id.widget_device_name, lastDevice?.name ?: "AirSync")
-
-            // Read persisted Mac status snapshot
-            val macStatus =
-                runBlocking { DataStoreManager(context).getMacStatusForWidget().first() }
+            views.setTextViewText(R.id.widget_device_name, lastDevice?.name ?: context.getString(R.string.app_name))
 
             // Battery overlay and secondary line
             if (isConnected && macStatus.batteryLevel != null) {
@@ -143,7 +144,7 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
                 val secondaryText = when {
                     lastDevice != null -> {
                         val lastSeenMs = lastDevice.lastConnected
-                        if (lastSeenMs > 0) formatLastSeen(lastSeenMs) else "Last seen: unknown"
+                        if (lastSeenMs > 0) formatLastSeen(context, lastSeenMs) else context.getString(R.string.widget_last_seen_unknown)
                     }
 
                     else -> ""
@@ -217,29 +218,17 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
 
     // (no additional companion objects)
 
-    private fun formatLastSeen(lastSeenMs: Long): String {
+    private fun formatLastSeen(context: Context, lastSeenMs: Long): String {
         val now = System.currentTimeMillis()
         val diff = (now - lastSeenMs).coerceAtLeast(0)
         val minute = 60_000L
         val hour = 60 * minute
         val day = 24 * hour
-        val text = when {
-            diff < minute -> "Last seen just now"
-            diff < hour -> {
-                val m = (diff / minute).toInt()
-                "Last seen ${m} min ago"
-            }
-
-            diff < day -> {
-                val h = (diff / hour).toInt()
-                "Last seen ${h} hr ago"
-            }
-
-            else -> {
-                val d = (diff / day).toInt()
-                "Last seen ${d} day${if (d == 1) "" else "s"} ago"
-            }
+        return when {
+            diff < minute -> context.getString(R.string.widget_last_seen_just_now)
+            diff < hour -> context.getString(R.string.widget_last_seen_min, (diff / minute).toInt())
+            diff < day -> context.getString(R.string.widget_last_seen_hr, (diff / hour).toInt())
+            else -> context.getString(R.string.widget_last_seen_day, (diff / day).toInt())
         }
-        return text
     }
 }

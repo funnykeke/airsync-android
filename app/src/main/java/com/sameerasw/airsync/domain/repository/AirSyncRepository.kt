@@ -15,8 +15,6 @@ interface AirSyncRepository {
     suspend fun saveDeviceName(deviceName: String)
     fun getDeviceName(): Flow<String>
 
-    suspend fun setFirstRun(isFirstRun: Boolean)
-    fun getFirstRun(): Flow<Boolean>
 
     suspend fun setPermissionsChecked(checked: Boolean)
     fun getPermissionsChecked(): Flow<Boolean>
@@ -83,9 +81,6 @@ interface AirSyncRepository {
     suspend fun setKeepPreviousLinkEnabled(enabled: Boolean)
     fun getKeepPreviousLinkEnabled(): Flow<Boolean>
 
-    // Smartspacer settings
-    suspend fun setSmartspacerShowWhenDisconnected(enabled: Boolean)
-    fun getSmartspacerShowWhenDisconnected(): Flow<Boolean>
 
     // User manual disconnect tracking
     suspend fun setUserManuallyDisconnected(disconnected: Boolean)
@@ -121,10 +116,6 @@ interface AirSyncRepository {
     suspend fun setWidgetTransparency(alpha: Float)
     fun getWidgetTransparency(): Flow<Float>
 
-    // Essentials Bridge
-    suspend fun setEssentialsConnectionEnabled(enabled: Boolean)
-    fun getEssentialsConnectionEnabled(): Flow<Boolean>
-
     // Expanded Networking
     suspend fun setExpandNetworkingEnabled(enabled: Boolean)
     fun getExpandNetworkingEnabled(): Flow<Boolean>
@@ -134,12 +125,6 @@ interface AirSyncRepository {
     fun getDeviceDiscoveryEnabled(): Flow<Boolean>
 
     // Rating card refined logic
-    suspend fun setFirstMacConnectionTime(time: Long)
-    fun getFirstMacConnectionTime(): Flow<Long>
-    suspend fun setLastPromptDismissedVersion(version: Int)
-    fun getLastPromptDismissedVersion(): Flow<Int>
-    suspend fun setHasRatedApp(hasRated: Boolean)
-    fun hasRatedApp(): Flow<Boolean>
 
     // Quick Share (receiving)
     suspend fun setQuickShareEnabled(enabled: Boolean)

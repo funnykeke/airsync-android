@@ -90,7 +90,7 @@ fun ConnectionStatusCard(
                 val previewRes = DevicePreviewResolver.getPreviewRes(connectedDevice)
                 Image(
                     painter = painterResource(id = previewRes),
-                    contentDescription = "Connected Mac preview",
+                    contentDescription = stringResource(R.string.ui_connected_mac_preview),
                     modifier = Modifier.fillMaxWidth(0.75f),
                     contentScale = ContentScale.Fit,
                     colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(MaterialTheme.colorScheme.primary)
@@ -111,24 +111,7 @@ fun ConnectionStatusCard(
                         modifier = Modifier.weight(1f)
                     )
 
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (connectedDevice.isPlus)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp)
-                    ) {
-                        Text(
-                            text = if (connectedDevice.isPlus) "PLUS" else "FREE",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (connectedDevice.isPlus)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+
                 }
 
                 FlowRow(
@@ -136,7 +119,7 @@ fun ConnectionStatusCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val ips =
+                    val ips = if (uiState.transportMode == "relay") emptyList() else
                         uiState.ipAddress.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                     ips.forEach { ip ->
                         val isActive = ip == uiState.activeIp
@@ -183,8 +166,9 @@ fun ConnectionStatusCard(
             ) {
                 val statusText = when {
                     isPaused -> stringResource(R.string.paused)
-                    isConnecting -> "Connecting..."
-                    isConnected -> "Syncing"
+                    isConnected -> if (uiState.transportMode == "relay") "已连接 · 中转" else "已连接 · 局域网"
+                    isConnecting && uiState.transportMode == "relay" -> uiState.response
+                    isConnecting -> "正在连接…"
                     else -> stringResource(R.string.disconnected)
                 }
 
@@ -236,7 +220,7 @@ fun ConnectionStatusCard(
                         )
                         Spacer(modifier = Modifier.size(6.dp))
                         Text(
-                            text = "Disconnect",
+                            text = stringResource(R.string.ui_disconnect),
                             style = MaterialTheme.typography.labelLarge,
                             maxLines = 1
                         )
