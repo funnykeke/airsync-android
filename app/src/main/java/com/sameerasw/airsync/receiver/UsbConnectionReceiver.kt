@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,9 @@ class UsbConnectionReceiver : BroadcastReceiver() {
                     WebSocketUtil.disconnectUsb(context.applicationContext)
                     Activity.RESULT_OK
                 }
-            } catch (_: Exception) {
+            } catch (exception: Exception) {
+                // Exception messages/stack traces may contain endpoint or pairing material.
+                Log.i("AirSyncConnection", "event=usb_receiver_exception class=${exception.javaClass.simpleName}")
                 pending.resultCode = Activity.RESULT_CANCELED
             } finally {
                 pending.finish()

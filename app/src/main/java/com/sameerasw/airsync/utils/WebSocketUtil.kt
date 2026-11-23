@@ -1,6 +1,7 @@
 package com.sameerasw.airsync.utils
 
 import android.content.Context
+import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.service.AirSyncService
 import com.sameerasw.airsync.service.MediaNotificationListener
@@ -41,8 +42,20 @@ object WebSocketUtil {
     private var statusCallback: ((Boolean) -> Unit)? = null
     private var messageCallback: ((String) -> Unit)? = null
     private var authTimeoutCallback: (() -> Unit)? = null
+    private var publishedGeneration = lifecycle.generation
+
+    /** Only fixed codes and lifecycle metadata; never log error text or peer material. */
+    private fun diagnostic(event: String, token: Long = lifecycle.generation) {
+        val snapshot = lifecycle.snapshot
+        val mode = snapshot.mode.takeIf { it in setOf("local", "relay", "usb") } ?: "other"
+        Log.i("AirSyncConnection", "event=$event mode=$mode phase=${snapshot.phase} generation=${lifecycle.generation} token=$token")
+    }
 
     private fun publish() {
+        if (_status.value != lifecycle.snapshot || publishedGeneration != lifecycle.generation) {
+            diagnostic("transition")
+            publishedGeneration = lifecycle.generation
+        }
         _status.value = lifecycle.snapshot
         _connected.value = lifecycle.snapshot.connected
         listeners.forEach { runCatching { it(_connected.value) } }
@@ -71,26 +84,37 @@ object WebSocketUtil {
     /** ADB reverse owns this fixed endpoint. Never accept addresses, keys or ports from a broadcast. */
     suspend fun connectUsb(context: Context): Boolean = withContext(Dispatchers.Main.immediate) {
         val token = lifecycle.generation
+        diagnostic("usb_request", token)
         val ds = DataStoreManager.getInstance(context)
         val preferred = ds.getTransportMode().first()
         val pairedKey = if (preferred == "relay") ds.getRelaySymmetricKey().first() else ds.getLastConnectedDevice().first()?.symmetricKey
-        val enabled = ds.getAutoReconnectEnabled().first() && !ds.isAppPaused().first()
+        val enabled = ds.getAutoReconnectEnabled().first()
+        val paused = enabled && ds.isAppPaused().first()
         val manual = ds.getUserManuallyDisconnected().first()
-        if (manualGate.stopped || manual || !enabled || !TransportCapabilities.validKey(pairedKey)) return@withContext false
-        if (isUsbMode() && (isConnected() || isConnecting())) return@withContext true
-        if (!lifecycle.accepts(token)) return@withContext false
+        val decision = UsbAdmissionPolicy.decide(manualGate.stopped, manual, enabled, paused,
+            TransportCapabilities.validKey(pairedKey), isUsbMode() && (isConnected() || isConnecting()), lifecycle.accepts(token))
+        diagnostic("usb_admission_${decision.code}", token)
+        when (decision) {
+            UsbAdmissionDecision.ALREADY_ACTIVE -> return@withContext true
+            UsbAdmissionDecision.ACCEPTED -> Unit
+            else -> return@withContext false
+        }
         connectTransport(context, "127.0.0.1", 16996, pairedKey, manualAttempt = false, usbAttempt = true)
         AirSyncService.start(context, null)
         true
     }
     fun disconnectUsb(context: Context) { scope.launch {
-        if (isUsbMode() && !manualGate.stopped && (isConnected() || isConnecting())) lost(context, lifecycle.generation, "USB 已断开")
+        diagnostic("usb_disconnect_request")
+        if (isUsbMode() && !manualGate.stopped && (isConnected() || isConnecting())) lost(context, lifecycle.generation, "USB 已断开", "usb_detached")
     } }
     private fun connectTransport(context: Context, ipAddress: String, port: Int, symmetricKey: String?, onConnectionStatus: ((Boolean) -> Unit)? = null,
                 onMessage: ((String) -> Unit)? = null, manualAttempt: Boolean = true, onHandshakeTimeout: (() -> Unit)? = null,
                 usbAttempt: Boolean = false) {
         scope.launch {
-            if (!manualAttempt && (manualGate.stopped || (!usbAttempt && (isConnected() || isConnecting())))) return@launch
+            if (!manualAttempt && (manualGate.stopped || (!usbAttempt && (isConnected() || isConnecting())))) {
+                if (usbAttempt) diagnostic("usb_transport_manual_stop")
+                return@launch
+            }
             appContext = context.applicationContext
             attemptJob?.cancel()
             closeTransport()
@@ -104,18 +128,31 @@ object WebSocketUtil {
             attemptJob = scope.launch {
                 val ds = DataStoreManager.getInstance(context)
                 if (manualAttempt) ds.setUserManuallyDisconnected(false)
-                else if (ds.getUserManuallyDisconnected().first() || !ds.getAutoReconnectEnabled().first() || ds.isAppPaused().first()) {
-                    if (lifecycle.accepts(token)) { lifecycle.disconnect(); publish() }
-                    return@launch
+                else {
+                    val rejection = when {
+                        ds.getUserManuallyDisconnected().first() -> "manual_stop"
+                        !ds.getAutoReconnectEnabled().first() -> "auto_disabled"
+                        ds.isAppPaused().first() -> "paused"
+                        else -> null
+                    }
+                    if (rejection != null) {
+                        if (usbAttempt) diagnostic("usb_transport_$rejection", token)
+                        if (lifecycle.accepts(token)) { lifecycle.disconnect(); publish() }
+                        return@launch
+                    }
                 }
                 val mode = if (usbAttempt) "usb" else ds.getTransportMode().first()
-                if (!lifecycle.accepts(token)) return@launch
+                if (!lifecycle.accepts(token)) {
+                    if (usbAttempt) diagnostic("usb_transport_superseded", token)
+                    return@launch
+                }
                 lifecycle.transition(ConnectionPhase.CONNECTING)
                 // A generation begins only once; changing mode here still invalidates all prior sockets.
                 val session = lifecycle.begin(mode)
                 publish()
                 val keyText = symmetricKey?.takeIf { it.isNotBlank() } ?: if (mode == "relay") ds.getRelaySymmetricKey().first() else ds.getLastConnectedDevice().first()?.symmetricKey
                 if (!TransportCapabilities.validKey(keyText)) {
+                    if (usbAttempt) diagnostic("usb_transport_invalid_pairing", session)
                     phase(ConnectionPhase.ERROR, "请填写有效的 AES 加密密钥（从 Mac 复制，双方必须一致）")
                     return@launch
                 }
@@ -137,8 +174,8 @@ object WebSocketUtil {
                             when (state) {
                                 RelayConnection.State.WAITING -> { timeoutJob?.cancel(); SyncManager.stopPeriodicSync(); lifecycle.peer(false); publish() }
                                 RelayConnection.State.PEER_ONLINE -> startHandshake(context, session)
-                                RelayConnection.State.DISCONNECTED -> lost(context, session, error)
-                                RelayConnection.State.ERROR -> { closeTransport(); phase(ConnectionPhase.ERROR, error ?: context.getString(com.sameerasw.airsync.R.string.relay_err_rejected)) }
+                                RelayConnection.State.DISCONNECTED -> lost(context, session, error, "relay_disconnected")
+                                RelayConnection.State.ERROR -> { diagnostic("relay_error", session); closeTransport(); phase(ConnectionPhase.ERROR, error ?: context.getString(com.sameerasw.airsync.R.string.relay_err_rejected)) }
                             }
                         } },
                         onMessage = { text -> scope.launch { receive(context, session, text) } }
@@ -162,11 +199,11 @@ object WebSocketUtil {
                             } }
                             override fun onMessage(webSocket: WebSocket, text: String) { scope.launch { if (socket === webSocket) receive(context, session, text) } }
                             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(code, reason) }
-                            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { scope.launch { if (socket === webSocket) lost(context, session, "连接已关闭") } }
+                            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { scope.launch { if (socket === webSocket) lost(context, session, "连接已关闭", "socket_closed") } }
                             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { scope.launch {
                                 if (!lifecycle.accepts(session)) return@launch
                                 failures++
-                                if (socket === webSocket || (socket == null && failures >= ips.size)) lost(context, session, "连接失败，请检查网络和 Mac 服务")
+                                if (socket === webSocket || (socket == null && failures >= ips.size)) lost(context, session, "连接失败，请检查网络和 Mac 服务", "socket_failed")
                             } }
                         })
                         pendingSockets.add(ws)
@@ -174,7 +211,7 @@ object WebSocketUtil {
                 }
                 if (lifecycle.snapshot.phase == ConnectionPhase.CONNECTING) {
                     timeoutJob?.cancel()
-                    timeoutJob = scope.launch { delay(20_000); if (lifecycle.accepts(session) && lifecycle.snapshot.phase == ConnectionPhase.CONNECTING) lost(context, session, "连接服务器超时") }
+                    timeoutJob = scope.launch { delay(20_000); if (lifecycle.accepts(session) && lifecycle.snapshot.phase == ConnectionPhase.CONNECTING) lost(context, session, "连接服务器超时", "connection_timeout") }
                 }
             }
         }
@@ -189,7 +226,7 @@ object WebSocketUtil {
             delay(15_000)
             if (lifecycle.accepts(token) && !isConnected()) {
                 authTimeoutCallback?.invoke()
-                lost(context, token, "握手超时，请确认 Mac 在线且双方加密密钥一致")
+                lost(context, token, "握手超时，请确认 Mac 在线且双方加密密钥一致", "handshake_timeout")
             }
         }
     }
@@ -197,7 +234,7 @@ object WebSocketUtil {
         if (!lifecycle.accepts(token)) return
         val plain = key?.let { CryptoUtil.decryptMessage(encrypted, it) }
         if (plain == null) {
-            lost(context, token, "无法解密 Mac 消息，请检查双方加密密钥是否一致"); return
+            lost(context, token, "无法解密 Mac 消息，请检查双方加密密钥是否一致", "decryption_failed"); return
         }
         val type = runCatching { JSONObject(plain).optString("type") }.getOrNull() ?: return
         if (!TransportCapabilities.allows(lifecycle.snapshot.mode, type)) return
@@ -229,8 +266,12 @@ object WebSocketUtil {
         WebSocketMessageHandler.handleIncomingMessage(context, plain)
         messageCallback?.invoke(plain)
     }
-    private fun lost(context: Context, token: Long, reason: String?) {
-        if (!lifecycle.accepts(token)) return
+    private fun lost(context: Context, token: Long, reason: String?, source: String) {
+        diagnostic("lost_$source", token)
+        if (!lifecycle.accepts(token)) {
+            diagnostic("lost_ignored_superseded", token)
+            return
+        }
         closeTransport()
         lifecycle.disconnect() // invalidate late socket callbacks before scheduling the retry
         phase(ConnectionPhase.RECONNECTING, reason)
@@ -268,7 +309,7 @@ object WebSocketUtil {
         val encrypted = key?.let { CryptoUtil.encryptMessage(message, it) } ?: return false
         val token = lifecycle.generation
         val sent = if (isRelayMode()) relay?.send(encrypted) == true else socket?.send(encrypted) == true
-        if (!sent) appContext?.let { context -> scope.launch { lost(context, token, "消息发送失败，正在重新连接") } }
+        if (!sent) appContext?.let { context -> scope.launch { lost(context, token, "消息发送失败，正在重新连接", "send_failed") } }
         return sent
     }
     internal fun localSessionToken(): Long? = lifecycle.generation.takeIf { !isRelayMode() && isConnected() }
@@ -300,6 +341,7 @@ object WebSocketUtil {
         SyncManager.stopPeriodicSync()
     }
     fun disconnect(context: Context? = null, manual: Boolean = false) {
+        diagnostic(if (manual) "disconnect_manual" else "disconnect")
         if (manual) { sendMessage("{\"type\":\"userDisconnected\",\"data\":{}}"); manualGate.stop() }
         lifecycle.disconnect() // synchronous cancellation fence for every asynchronous callback
         scope.launch {
