@@ -1,6 +1,7 @@
 package com.sameerasw.airsync.utils
 
 import android.app.RemoteInput
+import android.app.Notification
 import android.content.Intent
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
@@ -39,6 +40,11 @@ object NotificationDismissalUtil {
      * Store a notification for dismissal
      */
     fun storeNotification(id: String, notification: StatusBarNotification) {
+        if (isPlaybackNotification(notification)) {
+            getIdBySystemKey(notification.key)?.let { removeFromCaches(it) }
+            removeFromCaches(id)
+            return
+        }
         activeNotifications[id] = notification
         // Keep reverse lookup so we can map sbn.key -> id on removal
         try {
@@ -122,6 +128,11 @@ object NotificationDismissalUtil {
             val sbn = activeNotifications[notificationId]
             if (sbn == null) {
                 Log.w(TAG, "Notification with ID $notificationId not found for action $actionName")
+                return false
+            }
+            // Legacy client cards must not retain access to playback PendingIntents.
+            if (isPlaybackNotification(sbn)) {
+                removeFromCaches(notificationId)
                 return false
             }
 
@@ -248,4 +259,8 @@ object NotificationDismissalUtil {
     private fun getNotificationListenerService(): MediaNotificationListener? {
         return MediaNotificationListener.getInstance()
     }
+
+    private fun isPlaybackNotification(sbn: StatusBarNotification): Boolean =
+        NotificationForwardingPolicy.isPlayback(sbn.notification.category,
+            sbn.notification.extras?.containsKey(Notification.EXTRA_MEDIA_SESSION) == true)
 }

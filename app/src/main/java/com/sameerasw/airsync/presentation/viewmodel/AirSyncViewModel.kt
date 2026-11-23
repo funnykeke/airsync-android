@@ -16,6 +16,7 @@ import com.sameerasw.airsync.domain.model.NetworkDeviceConnection
 import com.sameerasw.airsync.domain.model.UiState
 import com.sameerasw.airsync.domain.repository.AirSyncRepository
 import com.sameerasw.airsync.utils.DeviceInfoUtil
+import com.sameerasw.airsync.utils.ConnectionEndpointPolicy
 import com.sameerasw.airsync.utils.DiscoveredDevice
 import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.NetworkMonitor
@@ -107,10 +108,10 @@ class AirSyncViewModel(
             }
 
             val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
-            if (isWsConnected && activeIp != null) {
-                repository.saveIpAddress(activeIp)
-            }
-            val savedIp = if (isWsConnected && activeIp != null) activeIp else repository.getIpAddress().first()
+            val editableIp = ConnectionEndpointPolicy.editableAddress(WebSocketUtil.status.value.mode, activeIp)
+            val persistedIp = repository.getIpAddress().first()
+            val savedIp = editableIp ?: ConnectionEndpointPolicy.recoverSavedAddress(persistedIp, deviceToShow?.ipAddress)
+            if (savedIp != persistedIp) repository.saveIpAddress(savedIp)
 
             _uiState.value = _uiState.value.copy(
                 isConnected = isGlobalConnected,
@@ -145,21 +146,15 @@ class AirSyncViewModel(
         }
 
         val activeIp = if (isWsConnected) WebSocketUtil.currentIpAddress else null
+        val editableIp = ConnectionEndpointPolicy.editableAddress(WebSocketUtil.status.value.mode, activeIp)
 
-        val initialIp = if (isWsConnected && activeIp != null) {
-            runBlocking {
-                repository.saveIpAddress(activeIp)
-                activeIp
-            }
-        } else {
-            null
-        }
-
-        val savedIp = initialIp ?: try {
+        val persistedIp = try {
             kotlinx.coroutines.runBlocking { repository.getIpAddress().first() }
         } catch (_: Exception) {
             ""
         }
+        val savedIp = editableIp ?: ConnectionEndpointPolicy.recoverSavedAddress(persistedIp, storedDevice?.ipAddress)
+        if (savedIp != persistedIp) runBlocking { repository.saveIpAddress(savedIp) }
 
         _uiState.value = _uiState.value.copy(
             isConnected = isGlobalConnected,

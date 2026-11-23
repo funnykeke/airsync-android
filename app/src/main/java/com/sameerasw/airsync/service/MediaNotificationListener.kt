@@ -14,6 +14,7 @@ import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationListenerRecovery
+import com.sameerasw.airsync.utils.NotificationForwardingPolicy
 import com.sameerasw.airsync.utils.PermissionUtil
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
@@ -127,6 +128,12 @@ class MediaNotificationListener : NotificationListenerService() {
         try {
             val currentKeys = mutableSetOf<String>()
             activeNotifications?.forEach { sbn ->
+                if (shouldSkipNotification(sbn)) {
+                    NotificationDismissalUtil.getIdBySystemKey(sbn.key)?.let {
+                        NotificationDismissalUtil.removeFromCaches(it)
+                    }
+                    return@forEach
+                }
                 currentKeys.add(sbn.key)
                 val title = sbn.notification?.extras?.getString(Notification.EXTRA_TITLE) ?: ""
                 val notificationId = NotificationDismissalUtil.getIdBySystemKey(sbn.key)
@@ -217,6 +224,13 @@ class MediaNotificationListener : NotificationListenerService() {
     private fun processNotificationForSync(sbn: StatusBarNotification) {
         serviceScope.launch {
             try {
+                // Check before any preference read or cached action registration.
+                if (shouldSkipNotification(sbn)) {
+                    NotificationDismissalUtil.getIdBySystemKey(sbn.key)?.let {
+                        NotificationDismissalUtil.removeFromCaches(it)
+                    }
+                    return@launch
+                }
                 // Skip notifications from AirSync itself to prevent feedback loops
                 if (sbn.packageName == packageName) {
                     return@launch
@@ -245,12 +259,6 @@ class MediaNotificationListener : NotificationListenerService() {
                 // A missing preference is not consent to synchronize an app.
                 if (appSettings?.isEnabled != true) {
                     Log.d(TAG, "App ${sbn.packageName} is not enabled for notifications, skipping")
-                    return@launch
-                }
-
-                // Skip system notifications
-                if (shouldSkipNotification(sbn)) {
-                    Log.d(TAG, "Skipping notification from ${sbn.packageName}")
                     return@launch
                 }
 
@@ -416,8 +424,10 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private fun shouldSkipNotification(sbn: StatusBarNotification): Boolean {
-        // Skip system packages
-        return SYSTEM_PACKAGES.contains(sbn.packageName)
+        return SYSTEM_PACKAGES.contains(sbn.packageName) || NotificationForwardingPolicy.isPlayback(
+            sbn.notification.category,
+            sbn.notification.extras?.containsKey(Notification.EXTRA_MEDIA_SESSION) == true
+        )
     }
 
     private fun getAppNameFromPackage(packageName: String): String {
