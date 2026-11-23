@@ -15,7 +15,7 @@ class ConnectionLifecycle {
     }
     fun peer(online: Boolean) { transition(if (online) ConnectionPhase.HANDSHAKING else ConnectionPhase.WAITING_FOR_PEER) }
     fun beginHandshake(): Boolean {
-        if (snapshot.phase == ConnectionPhase.HANDSHAKING) return false
+        if (snapshot.phase in setOf(ConnectionPhase.HANDSHAKING, ConnectionPhase.CONNECTED)) return false
         peer(true)
         return true
     }
@@ -23,7 +23,7 @@ class ConnectionLifecycle {
     fun transition(phase: ConnectionPhase, error: String? = null) { snapshot = snapshot.copy(phase = phase, error = error) }
     fun disconnect() { generation++; transition(ConnectionPhase.DISCONNECTED) }
     fun accepts(token: Long) = token == generation
-    fun retryAllowed(token: Long, mode: String, manual: Boolean, enabled: Boolean) = accepts(token) && snapshot.mode == mode && !manual && enabled
+    fun retryAllowed(token: Long, mode: String, manual: Boolean, enabled: Boolean) = accepts(token) && (snapshot.mode == mode || snapshot.mode == "usb") && !manual && enabled
 }
 object TransportCapabilities {
     private val relayMessages = setOf(
@@ -32,7 +32,7 @@ object TransportCapabilities {
         "mediaControlResponse", "macMediaControlResponse", "volumeControl", "volumeControlResponse", "macVolume", "ping", "pong", "userDisconnected",
         "disconnectRequest", "toggleAppNotif", "toggleAppNotifResponse", "toggleNowPlaying", "toggleNowPlayingResponse"
     )
-    fun allows(mode: String, type: String) = mode == "local" || type in relayMessages
+    fun allows(mode: String, type: String) = mode in setOf("local", "usb") || type in relayMessages
     fun validKey(value: String?): Boolean = try {
         value != null && java.util.Base64.getDecoder().decode(value.trim()).size in setOf(16, 24, 32)
     } catch (_: IllegalArgumentException) { false }

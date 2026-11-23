@@ -150,7 +150,7 @@ private fun ClipboardActionScreen(
                     ShortcutUtil.DASH_ACTION_RECONNECT -> {
                         val ds = DataStoreManager.getInstance(context)
                         ds.setUserManuallyDisconnected(false)
-                        WebSocketUtil.requestAutoReconnect(context)
+                        WebSocketUtil.resumeAutoReconnect(context)
                         uiState = ClipboardUiState.Success
                         delay(1200)
                         onFinished()
@@ -179,7 +179,7 @@ private fun ClipboardActionScreen(
                             com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.start(context, isDiscovery)
                         }
                         com.sameerasw.airsync.service.AirSyncService.startScanning(context)
-                        WebSocketUtil.requestAutoReconnect(context)
+                        WebSocketUtil.resumeAutoReconnect(context)
                         ShortcutUtil.refreshShortcuts(context, false)
                         uiState = ClipboardUiState.Success
                         delay(1200)

@@ -148,7 +148,7 @@ object DiscoveryOrchestrator {
 
         CoroutineScope(Dispatchers.IO).launch {
             val ds = DataStoreManager.getInstance(context)
-            if (ds.getTransportMode().first() != "local") {
+            if (ds.getTransportMode().first() != "local" || com.sameerasw.airsync.utils.WebSocketUtil.isUsbMode()) {
                 withContext(Dispatchers.Main) { stop(context) }
                 return@launch
             }

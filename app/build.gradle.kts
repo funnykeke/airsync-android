@@ -15,8 +15,8 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         targetSdk = 37
-        versionCode = 39
-        versionName = "4.3.0"
+        versionCode = 40
+        versionName = "4.3.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "MIN_MAC_APP_VERSION", "\"4.0.0\"")

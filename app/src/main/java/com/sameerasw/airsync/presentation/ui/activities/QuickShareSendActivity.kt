@@ -90,7 +90,7 @@ class QuickShareSendActivity : ComponentActivity() {
                     sharedText = sharedText,
                     pairedDeviceName = uiState.lastConnectedDevice?.name,
                     isConnected = uiState.isConnected,
-                    transportMode = uiState.transportMode,
+                    transportMode = uiState.effectiveTransportMode,
                     onFinished = { finish() }
                 )
             }

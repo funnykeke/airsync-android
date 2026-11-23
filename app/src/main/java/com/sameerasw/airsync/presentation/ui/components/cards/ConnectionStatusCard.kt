@@ -119,7 +119,7 @@ fun ConnectionStatusCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val ips = if (uiState.transportMode == "relay") emptyList() else
+                    val ips = if (uiState.effectiveTransportMode != "local") emptyList() else
                         uiState.ipAddress.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                     ips.forEach { ip ->
                         val isActive = ip == uiState.activeIp
@@ -166,8 +166,13 @@ fun ConnectionStatusCard(
             ) {
                 val statusText = when {
                     isPaused -> stringResource(R.string.paused)
-                    isConnected -> if (uiState.transportMode == "relay") "已连接 · 中转" else "已连接 · 局域网"
-                    isConnecting && uiState.transportMode == "relay" -> uiState.response
+                    isConnected -> when (uiState.effectiveTransportMode) {
+                        "usb" -> stringResource(R.string.connected_usb)
+                        "relay" -> "已连接 · 中转"
+                        else -> "已连接 · 局域网"
+                    }
+                    isConnecting && uiState.effectiveTransportMode == "usb" -> stringResource(R.string.notif_usb_connecting)
+                    isConnecting && uiState.effectiveTransportMode == "relay" -> uiState.response
                     isConnecting -> "正在连接…"
                     else -> stringResource(R.string.disconnected)
                 }

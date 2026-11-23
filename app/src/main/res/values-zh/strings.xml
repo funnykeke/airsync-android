@@ -366,4 +366,7 @@
         <item>已拷贝</item>
         <item>copied</item>
     </string-array>
+    <string name="notif_usb_title">AirSync · USB</string>
+    <string name="notif_usb_connecting">正在通过 USB 验证 Mac…</string>
+    <string name="connected_usb">已连接 · USB</string>
 </resources>

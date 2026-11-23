@@ -5,16 +5,34 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ConnectionLifecycleTest {
-    @Test fun replacementPeerRequiresFreshHandshakeWhileAlreadyConnected() {
+    @Test fun duplicatePeerOnlineDoesNotRestartAuthenticatedSession() {
         val connection = ConnectionLifecycle()
         connection.begin("relay")
         assertTrue(connection.beginHandshake())
         assertFalse(connection.beginHandshake())
         connection.authenticated()
         assertTrue(connection.snapshot.connected)
+        assertFalse(connection.beginHandshake())
+        assertEquals(ConnectionPhase.CONNECTED, connection.snapshot.phase)
+        connection.peer(false)
         assertTrue(connection.beginHandshake())
         assertEquals(ConnectionPhase.HANDSHAKING, connection.snapshot.phase)
-        assertFalse(connection.snapshot.connected)
+    }
+    @Test fun usbUsesFullLocalProtocolWithoutPretendingToBeRelay() {
+        assertTrue(TransportCapabilities.allows("usb", "remoteControl"))
+        assertTrue(TransportCapabilities.allows("usb", "clipboardImage"))
+        assertFalse(TransportCapabilities.allows("relay", "remoteControl"))
+    }
+    @Test fun usbRetryCanReturnToSavedNetworkPreference() {
+        for (preferred in listOf("local", "relay")) {
+            val c = ConnectionLifecycle()
+            val token = c.begin("usb")
+            assertTrue(c.retryAllowed(token, preferred, false, true))
+            assertFalse(c.retryAllowed(token, preferred, true, true))
+            assertFalse(c.retryAllowed(token, preferred, false, false))
+            c.disconnect()
+            assertFalse(c.retryAllowed(token, preferred, false, true))
+        }
     }
     @Test fun relayWaitsWithoutPretendingToBeConnected() {
         val connection = ConnectionLifecycle()

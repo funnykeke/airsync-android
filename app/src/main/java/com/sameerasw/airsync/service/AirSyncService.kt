@@ -12,8 +12,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -58,6 +56,14 @@ class AirSyncService : Service() {
 
     private val connectionStatusListener: (Boolean) -> Unit = { _ ->
         scope.launch {
+            if (WebSocketUtil.isUsbMode()) {
+                isScanning = false
+                DiscoveryOrchestrator.stop(this@AirSyncService)
+                WakeupService.stopService(this@AirSyncService)
+                webDavJob?.cancel()
+                webDavJob = null
+                stopWebDavServer()
+            }
             updateNotification()
         }
     }
@@ -135,6 +141,7 @@ class AirSyncService : Service() {
     }
 
     private fun startScanning() {
+        if (WebSocketUtil.isUsbMode() && (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting())) return
         Log.d(TAG, "Starting AirSync scanning mode")
         isScanning = true
         connectedDeviceName = null
@@ -146,6 +153,7 @@ class AirSyncService : Service() {
             } catch (e: Exception) {
                 "local"
             }
+            if (WebSocketUtil.isUsbMode() && (WebSocketUtil.isConnected() || WebSocketUtil.isConnecting())) return@launch
             if (mode == "relay") {
                 Log.d(TAG, "Relay mode detected, connecting via relay instead of scanning")
                 val ds = DataStoreManager.getInstance(applicationContext)
@@ -165,6 +173,7 @@ class AirSyncService : Service() {
     }
 
     private suspend fun doLanScanning() {
+        if (WebSocketUtil.isUsbMode()) return
         withContext(Dispatchers.IO) {
             Log.d(TAG, "Starting LAN discovery")
             isScanning = true
@@ -182,6 +191,7 @@ class AirSyncService : Service() {
         scope.launch {
             val dataStoreManager = DataStoreManager.getInstance(applicationContext)
             val isDiscoveryEnabled = dataStoreManager.getDeviceDiscoveryEnabled().first()
+            if (dataStoreManager.getTransportMode().first() == "relay" || WebSocketUtil.isUsbMode()) return@launch
 
             // Default to PASSIVE mode to save battery
             // But do a burst to check for devices immediately
@@ -250,7 +260,7 @@ class AirSyncService : Service() {
     private fun handleAppForeground() {
         promoteToForeground()
         MediaNotificationListener.ensureListenerConnected(applicationContext)
-        if (isScanning && !WebSocketUtil.isRelayMode()) {
+        if (isScanning && !WebSocketUtil.isRelayMode() && !WebSocketUtil.isUsbMode()) {
             Log.d(TAG, "App in foreground, switching to ACTIVE discovery")
             DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.ACTIVE)
         }
@@ -258,7 +268,7 @@ class AirSyncService : Service() {
 
     private fun handleAppBackground() {
         promoteToForeground()
-        if (isScanning && !WebSocketUtil.isRelayMode()) {
+        if (isScanning && !WebSocketUtil.isRelayMode() && !WebSocketUtil.isUsbMode()) {
             Log.d(TAG, "App in background, switching to PASSIVE discovery")
             DiscoveryOrchestrator.setDiscoveryMode(this, DiscoveryMode.PASSIVE)
         }
@@ -284,7 +294,7 @@ class AirSyncService : Service() {
         scope.launch {
             val dataStoreManager = DataStoreManager.getInstance(applicationContext)
             val mode = dataStoreManager.getTransportMode().first()
-            if (mode == "relay") {
+            if (mode == "relay" || WebSocketUtil.isUsbMode()) {
                 // 中转模式不需要局域网 mDNS/UDP 发现与本地 HTTP 唤醒服务，彻底关闭以省电
                 DiscoveryOrchestrator.stop(this@AirSyncService)
                 WakeupService.stopService(this@AirSyncService)
@@ -293,6 +303,7 @@ class AirSyncService : Service() {
             }
 
             val isDiscoveryEnabled = dataStoreManager.getDeviceDiscoveryEnabled().first()
+            if (WebSocketUtil.isUsbMode()) return@launch
 
             // Keep discovery manager running for wake-ups in local mode (Passive)
             DiscoveryOrchestrator.start(this@AirSyncService, isDiscoveryEnabled)
@@ -319,28 +330,20 @@ class AirSyncService : Service() {
         try {
             val connectivityManager =
                 getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-            val builder = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
-
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    if (WebSocketUtil.isRelayMode()) return
-                    Log.d(
-                        TAG,
-                        "Network available, triggering burst broadcast and refreshing socket"
-                    )
-                    // Refresh UDP socket to bind to new network interface
-                    DiscoveryOrchestrator.refreshSocket()
-                    // When network becomes available, do a burst to announce ourselves
-                    if (isScanning) {
-                        DiscoveryOrchestrator.burstBroadcast(applicationContext)
+                    scope.launch {
+                        // requestAutoReconnect preserves a healthy session and every manual stop.
                         WebSocketUtil.requestAutoReconnect(applicationContext)
+                        val preferred = DataStoreManager.getInstance(applicationContext).getTransportMode().first()
+                        if (preferred == "relay" || WebSocketUtil.isUsbMode()) return@launch
+                        DiscoveryOrchestrator.refreshSocket()
+                        if (isScanning) DiscoveryOrchestrator.burstBroadcast(applicationContext)
                     }
                 }
             }
 
-            connectivityManager.registerNetworkCallback(builder.build(), networkCallback!!)
+            connectivityManager.registerDefaultNetworkCallback(networkCallback!!)
         } catch (e: Exception) {
             Log.e(TAG, "Error registering network callback", e)
         }
@@ -403,7 +406,13 @@ class AirSyncService : Service() {
             } else ""
         } ?: ""
 
-        if (WebSocketUtil.isRelayMode()) {
+        if (WebSocketUtil.isUsbMode() && (isConnected || isConnecting || isAuto)) {
+            builder.setContentTitle(getString(R.string.notif_usb_title))
+            builder.setContentText(WebSocketUtil.status.value.error ?: if (isConnected)
+                getString(R.string.connected_to_device, lastDevice?.name ?: "Mac") + batteryText
+                else getString(R.string.notif_usb_connecting))
+            builder.addAction(R.drawable.rounded_link_off_24, getString(R.string.disconnect), disconnectPendingIntent)
+        } else if (WebSocketUtil.isRelayMode()) {
             builder.setContentTitle(getString(R.string.notif_relay_title))
             val state = WebSocketUtil.status.value
             builder.setContentText(

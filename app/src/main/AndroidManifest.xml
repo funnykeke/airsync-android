@@ -231,6 +231,10 @@
             android:excludeFromRecents="true"
             android:taskAffinity="" />
 
+        <receiver
+            android:name=".receiver.UsbConnectionReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
     </application>
 
     <queries>

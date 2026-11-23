@@ -229,7 +229,7 @@ fun AirSyncMainScreen(
     val pagerState =
         rememberPagerState(
             initialPage = initialPage,
-            pageCount = { if (uiState.isConnected) { if (uiState.transportMode == "relay") 3 else 4 } else 2 })
+            pageCount = { if (uiState.isConnected) { if (uiState.effectiveTransportMode == "relay") 3 else 4 } else 2 })
 
     LaunchedEffect(pagerState.currentPage) {
         activeSettingsCategory = null
@@ -687,8 +687,8 @@ fun AirSyncMainScreen(
     }
 
     // Define tabs
-    val tabs = remember(uiState.isConnected, uiState.transportMode) {
-        if (uiState.isConnected && uiState.transportMode == "relay") {
+    val tabs = remember(uiState.isConnected, uiState.effectiveTransportMode) {
+        if (uiState.isConnected && uiState.effectiveTransportMode == "relay") {
             listOf(
                 AirSyncTab(R.string.tab_connect, Icons.Rounded.Phonelink, 0),
                 AirSyncTab(R.string.tab_clipboard, Icons.Rounded.ContentPaste, 1),
@@ -771,7 +771,7 @@ fun AirSyncMainScreen(
                         ),
                     state = pagerState
                 ) { page ->
-                    val contentPage = if (uiState.isConnected && uiState.transportMode == "relay" && page > 0) page + 1 else page
+                    val contentPage = if (uiState.isConnected && uiState.effectiveTransportMode == "relay" && page > 0) page + 1 else page
                     when (contentPage) {
                         0 -> {
                             // Connect tab content
@@ -809,7 +809,7 @@ fun AirSyncMainScreen(
 
                                     // Remote Functions Card (Lock Screen, etc.)
                                     AnimatedVisibility(
-                                        visible = uiState.isConnected && uiState.transportMode == "local",
+                                        visible = uiState.isConnected && uiState.effectiveTransportMode != "relay",
                                         enter = expandVertically() + fadeIn(),
                                         exit = shrinkVertically() + fadeOut()
                                     ) {
@@ -820,7 +820,7 @@ fun AirSyncMainScreen(
                                 }
 
                                 AnimatedVisibility(
-                                    visible = !uiState.isConnected && !uiState.isAppPaused && uiState.transportMode == "local",
+                                    visible = !uiState.isConnected && !uiState.isAppPaused && uiState.effectiveTransportMode == "local",
                                     enter = expandVertically() + fadeIn(),
                                     exit = shrinkVertically() + fadeOut()
                                 ) {

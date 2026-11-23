@@ -186,6 +186,7 @@ class AirSyncViewModel(
 viewModelScope.launch {
     WebSocketUtil.status.collect { status ->
         _uiState.value = _uiState.value.copy(
+            effectiveTransportMode = status.mode,
             isConnected = status.connected,
             isConnecting = WebSocketUtil.isConnecting(),
             relayError = status.error,
@@ -690,6 +691,10 @@ viewModelScope.launch {
 
     fun setAutoReconnectEnabled(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isAutoReconnectEnabled = enabled)
+        if (!enabled) {
+            WebSocketUtil.cancelAutoReconnect()
+            if (WebSocketUtil.isConnecting()) WebSocketUtil.disconnect(appContext)
+        }
         viewModelScope.launch {
             repository.setAutoReconnectEnabled(enabled)
             appContext?.let { ServiceManager.updateServiceState(it) }
@@ -928,7 +933,7 @@ viewModelScope.launch {
                 val isDiscovery = repository.getDeviceDiscoveryEnabled().first()
                 com.sameerasw.airsync.utils.discovery.DiscoveryOrchestrator.start(context, isDiscovery)
                 com.sameerasw.airsync.service.AirSyncService.startScanning(context)
-                WebSocketUtil.requestAutoReconnect(context)
+                WebSocketUtil.resumeAutoReconnect(context)
                 ShortcutUtil.refreshShortcuts(context, false)
             }
         }
@@ -968,7 +973,9 @@ viewModelScope.launch {
                         _deviceInfo.value = _deviceInfo.value.copy(localIp = currentIp)
 
                         // Relay sessions do not depend on a saved LAN address or Wi-Fi mapping.
+                        if (WebSocketUtil.isUsbMode()) return@collect
                         if (DataStoreManager.getInstance(context).getTransportMode().first() == "relay") {
+                            WebSocketUtil.requestAutoReconnect(context)
                             return@collect
                         }
 

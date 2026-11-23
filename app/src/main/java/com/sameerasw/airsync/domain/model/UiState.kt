@@ -29,6 +29,7 @@ data class UiState(
     val isMacMediaControlsEnabled: Boolean = true,
     // 中转模式
     val transportMode: String = "local",
+    val effectiveTransportMode: String = "local",
     val relayServerUrl: String = "",
     val relayRoom: String = "",
     val relaySecret: String = "",

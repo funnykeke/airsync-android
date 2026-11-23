@@ -362,4 +362,7 @@
     <string-array name="clipboard_copied_words">
         <item>copied</item>
     </string-array>
+    <string name="notif_usb_title">AirSync · USB</string>
+    <string name="notif_usb_connecting">Verifying Mac over USB…</string>
+    <string name="connected_usb">Connected · USB</string>
 </resources>

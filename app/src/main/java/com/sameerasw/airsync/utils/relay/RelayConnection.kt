@@ -60,7 +60,7 @@ class RelayConnection(
         if (closed) return
 
         val url = normalizedUrl()
-        Log.d(TAG, "Connecting to relay: $url (room=$room)")
+        Log.d(TAG, "Connecting to relay")
 
         val okClient = buildClient()
         if (okClient == null) {
@@ -85,7 +85,9 @@ class RelayConnection(
                     put("secret", secret)
                     put("role", "android")
                 }
-                webSocket.send(join.toString())
+                if (!closed && !webSocket.send(join.toString())) {
+                    onState(State.DISCONNECTED, context.getString(R.string.relay_err_disconnected))
+                }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -94,13 +96,13 @@ class RelayConnection(
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (closed) return
-                Log.e(TAG, "Relay connection failed: ${t.message}")
+                Log.e(TAG, "Relay connection failed")
                 onState(State.DISCONNECTED, context.getString(R.string.relay_err_disconnected))
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 if (closed) return
-                Log.d(TAG, "Relay closed: $code $reason")
+                Log.d(TAG, "Relay closed: $code")
                 onState(State.DISCONNECTED, context.getString(R.string.relay_err_disconnected))
             }
         })
@@ -143,7 +145,7 @@ class RelayConnection(
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Bad control frame: ${e.message}")
+                Log.w(TAG, "Bad relay control frame")
             }
             return
         }

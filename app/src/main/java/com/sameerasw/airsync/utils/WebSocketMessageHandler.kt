@@ -609,7 +609,7 @@ val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.m
                             val port = last.port
                             val symmetricKey = last.symmetricKey
 
-                            if (!WebSocketUtil.isRelayMode() && clientIp.isNotBlank() && ourIp.isNotBlank()) {
+                            if (!WebSocketUtil.isRelayMode() && !WebSocketUtil.isUsbMode() && clientIp.isNotBlank() && ourIp.isNotBlank()) {
                                 ds.saveNetworkDeviceConnection(
                                     deviceName = if (macName.isNotBlank()) macName else last.name,
                                     ourIp = ourIp,
