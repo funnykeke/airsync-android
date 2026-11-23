@@ -94,15 +94,6 @@ fun DefaultTabCard(
                         onDefaultTabChange("clipboard")
                     }
                 )
-                TabOption(
-                    title = stringResource(R.string.ui_dynamic),
-                    iconRes = R.drawable.rounded_asterisk_24,
-                    isSelected = currentDefaultTab == "dynamic",
-                    onClick = {
-                        HapticUtil.performClick(haptics)
-                        onDefaultTabChange("dynamic")
-                    }
-                )
             }
         }
     }

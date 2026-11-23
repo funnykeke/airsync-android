@@ -15,8 +15,8 @@ android {
         applicationId = "com.sameerasw.airsync"
         minSdk = 30
         targetSdk = 37
-        versionCode = 40
-        versionName = "4.3.1"
+        versionCode = 41
+        versionName = "4.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "MIN_MAC_APP_VERSION", "\"4.0.0\"")
@@ -110,8 +110,6 @@ dependencies {
     // WebSocket support
     implementation(libs.okhttp)
 
-    // Media session support for Mac media player
-    implementation("androidx.media:media:1.7.0")
 
     // CameraX for QR scanning
     implementation("androidx.camera:camera-core:1.4.0")

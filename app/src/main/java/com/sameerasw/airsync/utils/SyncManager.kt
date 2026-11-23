@@ -4,7 +4,7 @@ import com.sameerasw.airsync.R
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
-import com.sameerasw.airsync.domain.model.AudioInfo
+import com.sameerasw.airsync.domain.model.SystemVolume
 import com.sameerasw.airsync.domain.model.BatteryInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,16 +22,10 @@ object SyncManager {
     private const val MAX_DAILY_ICON_SYNCS = 3
 
     private var syncJob: Job? = null
-    private var lastAudioInfo: AudioInfo? = null
+    private var lastSystemVolume: SystemVolume? = null
     private var lastBatteryInfo: BatteryInfo? = null
-    private var lastVolume: Int = -1
     private val isSyncing = AtomicBoolean(false)
     private val iconSyncInProgress = AtomicBoolean(false)
-
-    // Track skip suppression mechanism
-    @Volatile
-    private var skipCommandTimestamp: Long = 0
-    private const val SKIP_SUPPRESSION_DURATION = 1000L // 1 second suppression after skip command
 
     fun startPeriodicSync(context: Context) {
         if (isSyncing.get()) {
@@ -47,12 +41,7 @@ object SyncManager {
                 try {
 
                     if (WebSocketUtil.isConnected()) {
-                        val dataStoreManager = DataStoreManager.getInstance(context)
-                        val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
-
-                        if (isSyncEnabled) {
-                            checkAndSyncDeviceStatus(context)
-                        }
+                        checkAndSyncDeviceStatus(context)
                     }
 
                     delay(BATTERY_SYNC_INTERVAL)
@@ -69,9 +58,8 @@ object SyncManager {
         isSyncing.set(false)
         syncJob?.cancel()
         syncJob = null
-        lastAudioInfo = null
+        lastSystemVolume = null
         lastBatteryInfo = null
-        lastVolume = -1
     }
 
     fun checkAndSyncDeviceStatus(context: Context, forceSync: Boolean = false) {
@@ -80,33 +68,9 @@ object SyncManager {
         }
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val dataStoreManager = DataStoreManager.getInstance(context)
-                val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
-
-                val currentAudio = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
+                val currentVolume = DeviceInfoUtil.getSystemVolume(context)
                 val currentBattery = DeviceInfoUtil.getBatteryInfo(context)
-
-                var shouldSync = forceSync
-
-                // Check if audio-related info changed
-                lastAudioInfo?.let { last ->
-                    if (last.isPlaying != currentAudio.isPlaying ||
-                        last.title != currentAudio.title ||
-                        last.artist != currentAudio.artist ||
-                        last.volume != currentAudio.volume ||
-                        last.isMuted != currentAudio.isMuted ||
-                        last.isBuffering != currentAudio.isBuffering ||
-                        last.playbackRate != currentAudio.playbackRate ||
-                        last.durationMs != currentAudio.durationMs ||
-                        kotlin.math.abs(last.positionMs - currentAudio.positionMs) >= 5_000L ||
-                        last.likeStatus != currentAudio.likeStatus
-                    ) {
-                        shouldSync = true
-                        Log.d(TAG, "Audio info changed, syncing device status")
-                    }
-                } ?: run {
-                    shouldSync = true // First time
-                }
+                var shouldSync = forceSync || lastSystemVolume != currentVolume
 
                 // Check if battery info changed significantly
                 lastBatteryInfo?.let { last ->
@@ -121,14 +85,12 @@ object SyncManager {
                 }
 
                 if (shouldSync) {
-                    val statusJson = JsonUtil.createDeviceStatusJson(currentBattery, currentAudio,
-                        includeNowPlaying && dataStoreManager.getSendNowPlayingEnabled().first())
+                    val statusJson = JsonUtil.createDeviceStatusJson(currentBattery, currentVolume)
                     val success = WebSocketUtil.sendMessage(statusJson)
 
                     if (success) {
-                        lastAudioInfo = currentAudio
+                        lastSystemVolume = currentVolume
                         lastBatteryInfo = currentBattery
-                        lastVolume = currentAudio.volume
                     } else {
                         Log.w(TAG, "Failed to sync device status (WebSocket)")
                     }
@@ -247,16 +209,14 @@ object SyncManager {
 
                 delay(150)
 
-                // 2. Send device status (respect now playing setting)
-                val includeNowPlaying = dataStoreManager.getSendNowPlayingEnabled().first()
-                val audio = DeviceInfoUtil.getAudioInfo(context, includeNowPlaying)
+                // 2. Send battery and system volume, independently of player state.
+                val volume = DeviceInfoUtil.getSystemVolume(context)
                 val battery = DeviceInfoUtil.getBatteryInfo(context)
-                val statusJson = JsonUtil.createDeviceStatusJson(battery, audio,
-                    includeNowPlaying && dataStoreManager.getSendNowPlayingEnabled().first())
+                val statusJson = JsonUtil.createDeviceStatusJson(battery, volume)
                 if (WebSocketUtil.sendMessage(statusJson)) {
                     Log.d(TAG, "Device status sent")
                     // Update cache
-                    lastAudioInfo = audio
+                    lastSystemVolume = volume
                     lastBatteryInfo = battery
                 } else {
                     Log.e(TAG, "Failed to send device status")
@@ -593,36 +553,9 @@ object SyncManager {
         checkAndSyncDeviceStatus(context)
     }
 
-    /**
-     * Call this before executing a track skip command to suppress automatic media updates
-     */
-    fun suppressMediaUpdatesForSkip() {
-        skipCommandTimestamp = System.currentTimeMillis()
-        Log.d(TAG, "Media update suppression activated for track skip")
-    }
-
-    /**
-     * Check if media updates should be suppressed due to recent skip command
-     */
-    private fun shouldSuppressMediaUpdate(): Boolean {
-        val timeSinceSkip = System.currentTimeMillis() - skipCommandTimestamp
-        return timeSinceSkip < SKIP_SUPPRESSION_DURATION
-    }
-
-    fun onMediaStateChanged(context: Context) {
-        // Check if we should suppress this update due to recent skip command
-        if (shouldSuppressMediaUpdate()) {
-            Log.d(TAG, "Media state change suppressed due to recent skip command")
-            return
-        }
-
-        Log.d(TAG, "Media state change detected, checking sync")
-        checkAndSyncDeviceStatus(context)
-    }
 
     fun reset() {
-        lastAudioInfo = null
+        lastSystemVolume = null
         lastBatteryInfo = null
-        lastVolume = -1
     }
 }

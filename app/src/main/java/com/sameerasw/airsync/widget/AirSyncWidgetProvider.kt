@@ -137,7 +137,7 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
                 val pct = macStatus.batteryLevel.coerceIn(0, 100)
                 views.setTextViewText(R.id.widget_battery_text, "$pct%")
                 views.setViewVisibility(R.id.widget_battery_container, android.view.View.VISIBLE)
-                // Hide secondary line when connected (we will use media info instead)
+                // Hide the last-seen line while showing the current battery
                 views.setViewVisibility(R.id.widget_secondary_line, android.view.View.GONE)
             } else {
                 views.setViewVisibility(R.id.widget_battery_container, android.view.View.GONE)
@@ -155,17 +155,6 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
                     if (secondaryText.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE
                 )
             }
-
-            // Media info when connected: show title - artist if present
-            if (isConnected && !macStatus.title.isNullOrBlank()) {
-                val mediaLine =
-                    if (!macStatus.artist.isNullOrBlank()) "${macStatus.title} — ${macStatus.artist}" else macStatus.title
-                views.setTextViewText(R.id.widget_media_info, mediaLine)
-                views.setViewVisibility(R.id.widget_media_info, android.view.View.VISIBLE)
-            } else {
-                views.setViewVisibility(R.id.widget_media_info, android.view.View.GONE)
-            }
-
 
             // Open app when tapping outer container (fallback/default)
             val openAppIntent = Intent(context, MainActivity::class.java).apply {

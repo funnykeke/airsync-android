@@ -12,9 +12,8 @@ import android.os.BatteryManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
-import com.sameerasw.airsync.domain.model.AudioInfo
+import com.sameerasw.airsync.domain.model.SystemVolume
 import com.sameerasw.airsync.domain.model.BatteryInfo
-import com.sameerasw.airsync.service.MediaNotificationListener
 import com.sameerasw.airsync.data.local.DataStoreManager
 import kotlinx.coroutines.flow.first
 import java.net.Inet4Address
@@ -110,6 +109,12 @@ object DeviceInfoUtil {
         }
     }
 
+    fun getSystemVolume(context: Context): SystemVolume {
+        val manager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val maximum = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val current = manager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        return SystemVolume(if (maximum > 0) (current * 100 / maximum).coerceIn(0, 100) else 0, current == 0)
+    }
     fun getBatteryInfo(context: Context): BatteryInfo {
         return try {
             val batteryIntent =
@@ -133,69 +138,10 @@ object DeviceInfoUtil {
         }
     }
 
-    fun getAudioInfo(context: Context, includeNowPlaying: Boolean = true): AudioInfo {
-        return try {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val isMuted = currentVolume == 0
-            val volumePercent = if (maxVolume > 0) {
-                (currentVolume * 100 / maxVolume)
-            } else {
-                0
-            }
 
-            if (!includeNowPlaying) {
-                // Skip querying media sessions; return only volume/mute info
-                return AudioInfo(
-                    isPlaying = false,
-                    title = "",
-                    artist = "",
-                    volume = volumePercent,
-                    isMuted = isMuted,
-                    albumArt = null,
-                    albumArtLite = null,
-                    durationMs = 0L,
-                    positionMs = 0L,
-                    positionTimestampMs = 0L,
-                    isBuffering = false,
-                    likeStatus = "none"
-                )
-            }
+    fun generateDeviceStatusJson(context: Context): String =
+        JsonUtil.createDeviceStatusJson(getBatteryInfo(context), getSystemVolume(context))
 
-            // Get media information including like status
-            val mediaInfo = MediaNotificationListener.getMediaInfo(context)
-            // Log.d("DeviceInfoUtil", "Retrieved media info: $mediaInfo")
-
-            AudioInfo(
-                isPlaying = mediaInfo.isPlaying,
-                title = mediaInfo.title.ifEmpty { "" },
-                artist = mediaInfo.artist.ifEmpty { "" },
-                volume = volumePercent,
-                isMuted = isMuted,
-                albumArt = mediaInfo.albumArt,
-                albumArtLite = mediaInfo.albumArtLite,
-                durationMs = mediaInfo.durationMs,
-                positionMs = mediaInfo.positionMs,
-                positionTimestampMs = mediaInfo.positionTimestampMs,
-                isBuffering = mediaInfo.isBuffering,
-                likeStatus = mediaInfo.likeStatus,
-                playbackRate = mediaInfo.playbackRate
-            )
-        } catch (e: Exception) {
-            Log.e("DeviceInfoUtil", "Error getting audio info: ${e.message}")
-            AudioInfo(false, "", "", 0, true, null, null, 0L, 0L, 0L, false, "none")
-        }
-    }
-
-    suspend fun generateDeviceStatusJson(context: Context): String {
-        val includeNowPlaying = DataStoreManager(context).getSendNowPlayingEnabled().first()
-        val batteryInfo = getBatteryInfo(context)
-        val audioInfo = getAudioInfo(context, includeNowPlaying)
-
-        return JsonUtil.createDeviceStatusJson(batteryInfo, audioInfo,
-            includeNowPlaying && DataStoreManager(context).getSendNowPlayingEnabled().first())
-    }
 
     fun isBlurProblematicDevice(): Boolean {
         // Samsung devices on One UI 7 (Android 15) or below have a broken blur implementation

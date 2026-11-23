@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="about_description">Battery-optimized AirSync Android client for syncing notifications, clipboard, media controls, and device status with Mac over LAN or self-hosted relay.</string>
+    <string name="about_description">Battery-optimized AirSync Android client for syncing notifications, clipboard, system volume, and battery status with Mac over LAN or self-hosted relay.</string>
     <string name="about_maintainer">Maintained by %1$s</string>
     <string name="about_upstream_attribution">Modified from the open-source sameerasw/airsync-android project under MPL-2.0 (with Additional Terms). Unofficial community/personal fork.</string>
     <string name="about_upstream_project">Upstream Project</string>
@@ -10,7 +10,6 @@
     <string name="action_configure">Configure</string>
     <string name="action_connect">Connect</string>
     <string name="action_dismiss">Dismiss</string>
-    <string name="action_exclude_media_apps">Exclude media apps</string>
     <string name="action_lock_screen">Lock</string>
     <string name="action_manual_connection">Manual connection</string>
     <string name="action_open">Open</string>
@@ -61,11 +60,11 @@
     <string name="disconnected">Disconnected</string>
     <string name="error_could_not_open_link">Could not open link</string>
     <string name="failed_to_send_clipboard">Failed to Send Clipboard</string>
-    <string name="help_adb_mirroring_body">Only available in LAN/USB mode. Install android-platform-tools and scrcpy on Mac, enable Wireless Debugging in Android Developer Options, and pair via ADB QR code in AirSync on Mac.</string>
+    <string name="help_adb_mirroring_body">Mirroring uses the built-in Mac window. Already-authorized ADB connections are selected automatically, preferring USB, then connected wireless ADB. Wireless debugging is not enabled or paired automatically.</string>
     <string name="help_getting_started_body">For local LAN mode, keep your Android and Mac on the same Wi-Fi network, then scan the QR code shown in AirSync on Mac or enter IP/port/key manually.</string>
-    <string name="help_permissions_body">• Notification Access: Required for notification &amp; media sync (enable Restricted Settings in App Info for sideloaded APKs).\n• Post Notifications: Shows ongoing connection status.\n• Ignore Battery Optimization: Keeps background sync alive.\n• Storage (Optional): For wallpaper sync and local file access.</string>
+    <string name="help_permissions_body">• Notification Access: Required for notification sync (enable Restricted Settings in App Info for sideloaded APKs).\n• Post Notifications: Shows ongoing connection status.\n• Ignore Battery Optimization: Keeps background sync alive.\n• Storage (Optional): For wallpaper sync and local file access.</string>
     <string name="help_reconnection_body">When disconnected unexpectedly, AirSync automatically retries in the background. You can also tap the Quick Settings tile to reconnect or pause anytime.</string>
-    <string name="help_relay_body">Relay mode lets you sync notifications, text clipboard, battery status, and media controls across different networks via your own WSS relay server. Enter identical server URL, room, room secret (≥16 chars), and copy the AES key from Mac. Leave cert fingerprint blank for CA-signed HTTPS domains, or enter the 64-char SHA-256 hex fingerprint for self-signed certs.</string>
+    <string name="help_relay_body">Relay mode lets you sync notifications, text clipboard, battery status, and system volume across different networks via your own WSS relay server. Enter identical server URL, room, room secret (≥16 chars), and copy the AES key from Mac. Leave cert fingerprint blank for CA-signed HTTPS domains, or enter the 64-char SHA-256 hex fingerprint for self-signed certs.</string>
     <string name="help_troubleshooting_body">• Notification stopped syncing: Re-open the app or check Notification Access permission.\n• Relay auth failed: Confirm the AES key from Mac matches and room secret is ≥16 chars.\n• LAN IP not found: Check Wi-Fi AP isolation or VPN routing.</string>
     <string name="label_clipboard_tile">Clipboard Tile</string>
     <string name="label_clipsync_credits">Background clipboard sync adapted from ClipSync by Bhanu (MIT)</string>
@@ -90,8 +89,6 @@
     <string name="label_ripple_animation">Ripple animation</string>
     <string name="label_use_blur">Use Blur</string>
     <string name="mac_app_outdated">Mac app is outdated (%1$s &lt; %2$s). Please update the Mac app and reconnect.</string>
-    <string name="media_from_your_mac">From your Mac</string>
-    <string name="media_nothing_playing">Nothing Playing</string>
     <string name="no_device_connected">No device connected</string>
     <string name="notif_access_required">Notification access required</string>
     <string name="notif_channel_status">AirSync Status</string>
@@ -127,8 +124,8 @@
     <string name="permission_local_network_button">Grant Local Network Access</string>
     <string name="permission_local_network_explain">AirSync needs access to your local network to discover and connect to your Mac over Wi-Fi.</string>
     <string name="permission_local_network_title">Local Network Access</string>
-    <string name="permission_local_network_why">Local network discovery allows the app to find and establish a secure, fast connection with your Mac on the same Wi-Fi network for syncing notifications, clipboard, and controlling media controls. Without this, Wi-Fi synchronization cannot function on Android 17+.</string>
-    <string name="permission_notif_access_why">This is the core permission for AirSync. Without it, AirSync cannot forward notifications or media playback status to your Mac. Data is always sent over your encrypted connection.</string>
+    <string name="permission_local_network_why">Local network discovery allows the app to find and establish a secure, fast connection with your Mac on the same Wi-Fi network for syncing notifications, clipboard, and controlling system volume. Without this, Wi-Fi synchronization cannot function on Android 17+.</string>
+    <string name="permission_notif_access_why">This is the core permission for AirSync. Without it, AirSync cannot forward notifications to your Mac. Data is always sent over your encrypted connection.</string>
     <string name="permission_post_notif_why">AirSync uses notifications to show connection status, file transfer progress, and link actions.</string>
     <string name="permission_storage_why">This optional permission is only used in local LAN mode for wallpaper sync and mounting/browsing phone storage from your paired Mac.</string>
     <string name="permissions_all_granted">All permissions granted</string>
@@ -172,7 +169,6 @@
     <string name="status_added">Added</string>
     <string name="subtitle_blur_disabled_power_save">Disabled to save power</string>
     <string name="subtitle_blur_disabled_samsung">Disabled due to compatibility issues with this Samsung device</string>
-    <string name="subtitle_exclude_media_apps">Apps excluded from now playing sync</string>
     <string name="subtitle_file_access">Mount storage in macOS Finder</string>
     <string name="subtitle_help_guides">Learn how to use AirSync</string>
     <string name="subtitle_notify_on_crash">Send a notification if something goes wrong</string>
@@ -231,7 +227,6 @@
     <string name="ui_disconnect">Disconnect</string>
     <string name="ui_discover_nearby_mac_devices_on_wi_fi">Discover nearby Mac devices on Wi-Fi</string>
     <string name="ui_drop_to_send">Drop to send</string>
-    <string name="ui_dynamic">Dynamic</string>
     <string name="ui_enables_wallpaper_sync_and_mac_file_access">Enables wallpaper sync and Mac File Access</string>
     <string name="ui_encryption_key_hint">Encryption key</string>
     <string name="ui_encryption_key_note">Copy this from the Mac app\'s connection settings. It encrypts messages between devices.</string>
@@ -251,9 +246,6 @@
     <string name="ui_keep_previous_link">Keep previous link</string>
     <string name="ui_keep_the_app_alive_when_inactive">Keep the app alive when inactive</string>
     <string name="ui_local_network_access">Local Network Access</string>
-    <string name="ui_mac_media_playback_controls">Mac media playback controls</string>
-    <string name="ui_media_and_files">Media and Files</string>
-    <string name="ui_media_controls_quick_share_and_more">Media controls, Quick Share, and more</string>
     <string name="ui_missing_permissions">Missing permissions</string>
     <string name="ui_mute">Mute</string>
     <string name="ui_need_more_help">Need more help?</string>
@@ -297,13 +289,9 @@
     <string name="ui_search">Search</string>
     <string name="ui_select_which_tab_the_app_should_open_to_by_defau">Select which tab the app should open to by default</string>
     <string name="ui_send">Send</string>
-    <string name="ui_send_now_playing">Phone → Mac: send media status</string>
     <string name="ui_settings">Settings</string>
-    <string name="ui_share_media_playback_details_with_desktop">Turning this off stops media session observation and music reporting; battery and notifications keep syncing</string>
     <string name="ui_show">Show</string>
     <string name="ui_show_connection_status_and_alerts">Show connection status and alerts</string>
-    <string name="ui_show_mac_media_controls">Show Mac Media Controls</string>
-    <string name="ui_show_media_controls_when_mac_is_playing_music">Show media controls when Mac is playing music</string>
     <string name="ui_show_system_apps">Show system apps</string>
     <string name="ui_shows_airsync_connection_and_discovery_status">Shows AirSync connection and discovery status</string>
     <string name="ui_success">Success</string>
@@ -335,12 +323,6 @@
     <string name="widget_last_seen_unknown">Last seen: unknown</string>
     <string name="widget_tap_to_reconnect">Tap to reconnect</string>
     <string name="your_mac">Your Mac</string>
-    <string name="mac_media_channel_name">Mac Media Player</string>
-    <string name="mac_media_playing_on_mac">Playing on Mac</string>
-    <string name="mac_media_previous">Previous</string>
-    <string name="mac_media_pause">Pause</string>
-    <string name="mac_media_play">Play</string>
-    <string name="mac_media_next">Next</string>
     <string name="quickshare_channel_name">Quick Share</string>
     <string name="quickshare_active">Quick Share is active</string>
     <string name="quickshare_pin_waiting">PIN: %1$s - Waiting for files…</string>
@@ -362,7 +344,13 @@
     <string-array name="clipboard_copied_words">
         <item>copied</item>
     </string-array>
-    <string name="notif_usb_title">AirSync · USB</string>
-    <string name="notif_usb_connecting">Verifying Mac over USB…</string>
-    <string name="connected_usb">Connected · USB</string>
+    <string name="notif_usb_title">AirSync · ADB</string>
+    <string name="notif_usb_connecting">Verifying Mac over ADB…</string>
+    <string name="connected_usb">Connected · ADB</string>
+    <string name="system_volume">Mac system volume</string>
+    <string name="volume_down">Volume down</string>
+    <string name="volume_up">Volume up</string>
+    <string name="toggle_mute">Toggle mute</string>
+    <string name="ui_files">Files</string>
+    <string name="ui_file_sharing_and_access">File sharing and access</string>
 </resources>

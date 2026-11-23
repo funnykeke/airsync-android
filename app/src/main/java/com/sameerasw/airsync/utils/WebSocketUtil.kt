@@ -307,7 +307,6 @@ object WebSocketUtil {
             val ctx = context ?: appContext
             ctx?.let {
                 if (manual) DataStoreManager.getInstance(it).setUserManuallyDisconnected(true)
-                com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(it)
                 MacDeviceStatusManager.cleanup(it)
                 NotificationUtil.clearContinueBrowsingNotifications(it)
             }

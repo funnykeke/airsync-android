@@ -17,7 +17,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "airsync_settings")
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "airsync_settings",
+    produceMigrations = { listOf(RemovePlaybackPreferences()) }
+)
 
 class DataStoreManager(private val context: Context) {
 
@@ -40,8 +43,6 @@ class DataStoreManager(private val context: Context) {
         // Widget-visible Mac status keys
         private val MAC_BATTERY_LEVEL = intPreferencesKey("mac_battery_level")
         private val MAC_BATTERY_CHARGING = booleanPreferencesKey("mac_battery_charging")
-        private val MAC_MUSIC_TITLE = stringPreferencesKey("mac_music_title")
-        private val MAC_MUSIC_ARTIST = stringPreferencesKey("mac_music_artist")
         private val MAC_WIDGET_REFRESH_AT = longPreferencesKey("mac_widget_refresh_at")
         private val NOTIFICATION_SYNC_ENABLED = booleanPreferencesKey("notification_sync_enabled")
         private val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
@@ -60,19 +61,12 @@ class DataStoreManager(private val context: Context) {
         // Continue Browsing feature toggle
         private val CONTINUE_BROWSING_ENABLED = booleanPreferencesKey("continue_browsing_enabled")
 
-        // Send now playing toggle
-        private val SEND_NOW_PLAYING_ENABLED = booleanPreferencesKey("send_now_playing_enabled")
-
-        // Excluded media packages preference
-        private val EXCLUDED_MEDIA_PACKAGES = stringPreferencesKey("excluded_media_packages")
 
         // Keep previous link toggle
         private val KEEP_PREVIOUS_LINK_ENABLED = booleanPreferencesKey("keep_previous_link_enabled")
 
         private val EXPAND_NETWORKING_ENABLED = booleanPreferencesKey("expand_networking_enabled")
 
-        // Mac Media controls toggle
-        private val MAC_MEDIA_CONTROLS_ENABLED = booleanPreferencesKey("mac_media_controls_enabled")
 
         private val DEFAULT_TAB = stringPreferencesKey("default_tab")
 
@@ -146,7 +140,6 @@ class DataStoreManager(private val context: Context) {
             preferences[DEVICE_NAME] ?: ""
         }
     }
-
 
 
     suspend fun setPermissionsChecked(checked: Boolean) {
@@ -231,32 +224,6 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    // Send now playing toggle
-    suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[SEND_NOW_PLAYING_ENABLED] = enabled
-        }
-    }
-
-    fun getSendNowPlayingEnabled(): Flow<Boolean> {
-        return context.dataStore.data.map { preferences ->
-            preferences[SEND_NOW_PLAYING_ENABLED] != false // Default to enabled
-        }
-    }
-
-    // Excluded media packages
-    suspend fun setExcludedMediaPackages(packages: Set<String>) {
-        context.dataStore.edit { preferences ->
-            preferences[EXCLUDED_MEDIA_PACKAGES] = packages.joinToString(",")
-        }
-    }
-
-    fun getExcludedMediaPackages(): Flow<Set<String>> {
-        return context.dataStore.data.map { preferences ->
-            val raw = preferences[EXCLUDED_MEDIA_PACKAGES] ?: ""
-            if (raw.isBlank()) emptySet() else raw.split(",").toSet()
-        }
-    }
 
     // Keep previous link toggle
     suspend fun setKeepPreviousLinkEnabled(enabled: Boolean) {
@@ -272,7 +239,6 @@ class DataStoreManager(private val context: Context) {
     }
 
 
-
     suspend fun setExpandNetworkingEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[EXPAND_NETWORKING_ENABLED] = enabled
@@ -285,17 +251,6 @@ class DataStoreManager(private val context: Context) {
         }
     }
 
-    suspend fun setMacMediaControlsEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[MAC_MEDIA_CONTROLS_ENABLED] = enabled
-        }
-    }
-
-    fun getMacMediaControlsEnabled(): Flow<Boolean> {
-        return context.dataStore.data.map { prefs ->
-            prefs[MAC_MEDIA_CONTROLS_ENABLED] ?: true // Default to true
-        }
-    }
 
     suspend fun setUseBlurEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
@@ -320,7 +275,6 @@ class DataStoreManager(private val context: Context) {
             preferences[PITCH_BLACK_THEME] ?: false // Default to disabled
         }
     }
-
 
 
     suspend fun setQuickShareEnabled(enabled: Boolean) {
@@ -355,14 +309,9 @@ class DataStoreManager(private val context: Context) {
 
     fun getDefaultTab(): Flow<String> {
         return context.dataStore.data.map { prefs ->
-            prefs[DEFAULT_TAB] ?: "dynamic"
+            prefs[DEFAULT_TAB]?.takeIf { it in setOf("connect", "remote", "clipboard") } ?: "connect"
         }
     }
-
-
-
-
-
 
 
     /** 单独保存加密密钥（relay 模式无法扫码，需从 Mac 端复制） */
@@ -448,15 +397,11 @@ suspend fun setRelaySymmetricKey(key: String) { context.dataStore.edit { it[RELA
     // --- Mac status persisted for widget ---
     suspend fun saveMacStatusForWidget(
         batteryLevel: Int,
-        isCharging: Boolean,
-        title: String,
-        artist: String
+        isCharging: Boolean
     ) {
         context.dataStore.edit { preferences ->
             preferences[MAC_BATTERY_LEVEL] = batteryLevel
             preferences[MAC_BATTERY_CHARGING] = isCharging
-            preferences[MAC_MUSIC_TITLE] = title
-            preferences[MAC_MUSIC_ARTIST] = artist
         }
     }
 
@@ -474,18 +419,14 @@ suspend fun setRelaySymmetricKey(key: String) { context.dataStore.edit { it[RELA
 
     data class MacStatusSnapshot(
         val batteryLevel: Int?,
-        val isCharging: Boolean?,
-        val title: String?,
-        val artist: String?
+        val isCharging: Boolean?
     )
 
     fun getMacStatusForWidget(): Flow<MacStatusSnapshot> =
         context.dataStore.data.map { preferences ->
             MacStatusSnapshot(
                 batteryLevel = preferences[MAC_BATTERY_LEVEL],
-                isCharging = preferences[MAC_BATTERY_CHARGING],
-                title = preferences[MAC_MUSIC_TITLE],
-                artist = preferences[MAC_MUSIC_ARTIST]
+                isCharging = preferences[MAC_BATTERY_CHARGING]
             )
         }
 
@@ -910,6 +851,7 @@ suspend fun setRelaySymmetricKey(key: String) { context.dataStore.edit { it[RELA
                 val keys = prefsObj.keys()
                 while (keys.hasNext()) {
                     val keyName = keys.next()
+                    if (RemovePlaybackPreferences.isRetiredKey(keyName)) continue
                     try {
                         val entry = prefsObj.getJSONObject(keyName)
                         val type = entry.optString("type", "string")
@@ -982,7 +924,6 @@ suspend fun setRelaySymmetricKey(key: String) { context.dataStore.edit { it[RELA
     }
 
 
-
     suspend fun setDeviceId(deviceId: String) {
         context.dataStore.edit { preferences ->
             preferences[DEVICE_ID] = deviceId
@@ -1031,9 +972,6 @@ suspend fun setRelaySymmetricKey(key: String) { context.dataStore.edit { it[RELA
 
     fun getRelayPinnedCertSha256(): Flow<String> =
         context.dataStore.data.map { it[RELAY_PINNED_CERT_SHA256] ?: "" }
-
-
-
 
 
     suspend fun setUseRippleEnabled(enabled: Boolean) {

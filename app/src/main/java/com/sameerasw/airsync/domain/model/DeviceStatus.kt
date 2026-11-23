@@ -1,38 +1,6 @@
 package com.sameerasw.airsync.domain.model
 
-data class BatteryInfo(
-    val level: Int,
-    val isCharging: Boolean
-)
+data class BatteryInfo(val level: Int, val isCharging: Boolean)
 
-data class AudioInfo(
-    val isPlaying: Boolean,
-    val title: String,
-    val artist: String,
-    val volume: Int,
-    val isMuted: Boolean,
-    val albumArt: String? = null,
-    val albumArtLite: String? = null,
-    val durationMs: Long = 0L,
-    val positionMs: Long = 0L,
-    val positionTimestampMs: Long = 0L,
-    val isBuffering: Boolean = false,
-    // New: like status for current media ("liked", "not_liked", or "none")
-    val likeStatus: String = "none",
-    val playbackRate: Double = 1.0
-)
-
-data class MediaInfo(
-    val isPlaying: Boolean,
-    val title: String,
-    val artist: String,
-    val albumArt: String? = null,
-    val albumArtLite: String? = null,
-    val durationMs: Long = 0L,
-    val positionMs: Long = 0L,
-    val positionTimestampMs: Long = 0L,
-    val isBuffering: Boolean = false,
-    // New: like status for current media ("liked", "not_liked", or "none")
-    val likeStatus: String = "none",
-    val playbackRate: Double = 1.0
-)
+/** Device output volume, independent of any player or media session. */
+data class SystemVolume(val level: Int, val isMuted: Boolean)

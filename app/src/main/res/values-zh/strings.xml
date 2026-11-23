@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="about_description">省电精简版 AirSync 安卓客户端，支持通过局域网或自建中转服务器与 Mac 同步通知、剪贴板、媒体控制与设备状态。</string>
+    <string name="about_description">省电精简版 AirSync 安卓客户端，支持通过局域网或自建中转服务器与 Mac 同步通知、剪贴板、系统音量与电量。</string>
     <string name="about_maintainer">维护者：%1$s</string>
     <string name="about_upstream_attribution">基于开源项目 sameerasw/airsync-android（MPL-2.0 及附加条款）修改，非官方发行版。</string>
     <string name="about_upstream_project">上游原项目</string>
@@ -10,7 +10,6 @@
     <string name="action_configure">配置</string>
     <string name="action_connect">连接</string>
     <string name="action_dismiss">忽略</string>
-    <string name="action_exclude_media_apps">排除媒体应用</string>
     <string name="action_lock_screen">锁屏</string>
     <string name="action_manual_connection">手动连接</string>
     <string name="action_open">打开</string>
@@ -61,11 +60,11 @@
     <string name="disconnected">已断开</string>
     <string name="error_could_not_open_link">无法打开链接</string>
     <string name="failed_to_send_clipboard">剪贴板发送失败</string>
-    <string name="help_adb_mirroring_body">仅在局域网或 USB 模式下可用。请在 Mac 安装 android-platform-tools 和 scrcpy，在手机开发者选项中开启无线调试，并在 Mac 端使用 ADB 二维码完成配对。</string>
+    <string name="help_adb_mirroring_body">投屏使用 Mac 内置窗口。自动使用已授权的 ADB 连接，优先 USB，其次已连接的无线 ADB；不会自动开启无线调试或进行新配对。</string>
     <string name="help_getting_started_body">局域网直连模式下，请确保手机与 Mac 在同一 Wi-Fi 网络中，然后扫描 Mac 端 AirSync 显示的二维码，或手动输入 IP、端口与加密密钥连接。</string>
-    <string name="help_permissions_body">• 通知使用权：同步通知与媒体状态所必需（侧载安装若受限，请在应用信息右上角允许受限设置）。\n• 发送通知：显示常驻连接状态与传输提醒。\n• 关闭电池优化：防止后台同步被系统杀掉。\n• 存储权限（可选）：仅用于局域网壁纸同步与文件访问。</string>
+    <string name="help_permissions_body">• 通知使用权：同步通知所必需（侧载安装若受限，请在应用信息右上角允许受限设置）。\n• 发送通知：显示常驻连接状态与传输提醒。\n• 关闭电池优化：防止后台同步被系统杀掉。\n• 存储权限（可选）：仅用于局域网壁纸同步与文件访问。</string>
     <string name="help_reconnection_body">意外断开时 AirSync 会自动尝试重连；你也可以通过下拉快捷设置磁贴一键重连、发送剪贴板或暂停同步。</string>
-    <string name="help_relay_body">服务器中转模式可通过你自建的 WSS 中转服务跨网同步通知、文本剪贴板、电量与媒体控制。请确保两端填写相同的服务器地址、房间名和至少 16 位房间密钥，并从 Mac 复制 AES 加密密钥。若中转使用正规 CA 证书，证书指纹留空即可；若使用自签证书，填入 64 位 SHA-256 十六进制指纹。</string>
+    <string name="help_relay_body">服务器中转模式可通过你自建的 WSS 中转服务跨网同步通知、文本剪贴板、电量与系统音量。请确保两端填写相同的服务器地址、房间名和至少 16 位房间密钥，并从 Mac 复制 AES 加密密钥。若中转使用正规 CA 证书，证书指纹留空即可；若使用自签证书，填入 64 位 SHA-256 十六进制指纹。</string>
     <string name="help_troubleshooting_body">• 通知停止同步：请检查通知使用权是否开启并重新打开应用触发重绑。\n• 中转认证失败：请确认 Mac 端 AES 加密密钥与房间密钥（≥16 位）完全一致。\n• 局域网搜不到设备：请检查路由器 AP 隔离或手机/Mac 是否开启了阻断局域网的 VPN。</string>
     <string name="label_clipboard_tile">剪贴板磁贴</string>
     <string name="label_clipsync_credits">后台剪贴板同步改编自 Bhanu 的 ClipSync（MIT 许可）</string>
@@ -90,8 +89,6 @@
     <string name="label_ripple_animation">波纹动画</string>
     <string name="label_use_blur">启用模糊</string>
     <string name="mac_app_outdated">Mac 端版本过旧（%1$s &lt; %2$s），请升级 Mac 端后重新连接。</string>
-    <string name="media_from_your_mac">来自你的 Mac</string>
-    <string name="media_nothing_playing">暂无播放</string>
     <string name="no_device_connected">未连接设备</string>
     <string name="notif_access_required">需要授予通知使用权</string>
     <string name="notif_channel_status">AirSync 连接状态</string>
@@ -127,8 +124,8 @@
     <string name="permission_local_network_button">授予局域网访问权限</string>
     <string name="permission_local_network_explain">AirSync 需要访问局域网，才能通过 Wi-Fi 发现并连接你的 Mac。</string>
     <string name="permission_local_network_title">局域网访问</string>
-    <string name="permission_local_network_why">局域网发现让应用能够在同一 Wi-Fi 下找到你的 Mac 并建立安全、快速的连接，用于同步通知、剪贴板和媒体控制。若没有该权限，在 Android 17 及以上系统中 Wi-Fi 同步将无法工作。</string>
-    <string name="permission_notif_access_why">这是 AirSync 的核心权限。没有通知使用权，应用将无法转发通知和媒体播放状态到你的 Mac。所有数据均通过加密通道传输。</string>
+    <string name="permission_local_network_why">局域网发现让应用能够在同一 Wi-Fi 下找到你的 Mac 并建立安全、快速的连接，用于同步通知、剪贴板和系统音量。若没有该权限，在 Android 17 及以上系统中 Wi-Fi 同步将无法工作。</string>
+    <string name="permission_notif_access_why">这是 AirSync 的核心权限。没有通知使用权，应用将无法转发通知到你的 Mac。所有数据均通过加密通道传输。</string>
     <string name="permission_post_notif_why">AirSync 需要该权限来显示连接状态、文件传输进度和快捷操作提醒。</string>
     <string name="permission_storage_why">这项可选权限仅在局域网直连模式下用于壁纸同步，以及在 Mac 端浏览或挂载手机存储。</string>
     <string name="permissions_all_granted">所需权限均已授予</string>
@@ -172,7 +169,6 @@
     <string name="status_added">已添加</string>
     <string name="subtitle_blur_disabled_power_save">为省电已禁用</string>
     <string name="subtitle_blur_disabled_samsung">因与该三星设备存在兼容性问题已禁用</string>
-    <string name="subtitle_exclude_media_apps">不参与「正在播放」同步的应用</string>
     <string name="subtitle_file_access">在 macOS 访达中挂载存储</string>
     <string name="subtitle_help_guides">了解如何使用 AirSync</string>
     <string name="subtitle_notify_on_crash">出现问题时发送通知</string>
@@ -231,7 +227,6 @@
     <string name="ui_disconnect">断开连接</string>
     <string name="ui_discover_nearby_mac_devices_on_wi_fi">通过 Wi-Fi 发现附近的 Mac 设备</string>
     <string name="ui_drop_to_send">拖放以发送</string>
-    <string name="ui_dynamic">动态</string>
     <string name="ui_enables_wallpaper_sync_and_mac_file_access">启用壁纸同步与 Mac 文件访问</string>
     <string name="ui_encryption_key_hint">加密密钥</string>
     <string name="ui_encryption_key_note">从 Mac 端「连接方式」设置里复制。用于两端消息加密。</string>
@@ -251,9 +246,6 @@
     <string name="ui_keep_previous_link">保留上一个链接</string>
     <string name="ui_keep_the_app_alive_when_inactive">不活跃时保持应用存活</string>
     <string name="ui_local_network_access">局域网访问</string>
-    <string name="ui_mac_media_playback_controls">Mac 媒体播放控制</string>
-    <string name="ui_media_and_files">媒体与文件</string>
-    <string name="ui_media_controls_quick_share_and_more">媒体控制、快速分享等</string>
     <string name="ui_missing_permissions">缺少权限</string>
     <string name="ui_mute">静音</string>
     <string name="ui_need_more_help">还需要帮助？</string>
@@ -297,13 +289,9 @@
     <string name="ui_search">搜索</string>
     <string name="ui_select_which_tab_the_app_should_open_to_by_defau">选择应用默认打开的标签页</string>
     <string name="ui_send">发送</string>
-    <string name="ui_send_now_playing">手机 → Mac：发送媒体状态</string>
     <string name="ui_settings">设置</string>
-    <string name="ui_share_media_playback_details_with_desktop">关闭后停止媒体会话监听和音乐上报，电量与通知仍继续同步</string>
     <string name="ui_show">显示</string>
     <string name="ui_show_connection_status_and_alerts">显示连接状态与提醒</string>
-    <string name="ui_show_mac_media_controls">显示 Mac 媒体控制</string>
-    <string name="ui_show_media_controls_when_mac_is_playing_music">Mac 播放音乐时显示媒体控制</string>
     <string name="ui_show_system_apps">显示系统应用</string>
     <string name="ui_shows_airsync_connection_and_discovery_status">显示 AirSync 连接与发现状态</string>
     <string name="ui_success">成功</string>
@@ -335,12 +323,6 @@
     <string name="widget_last_seen_unknown">上次在线：未知</string>
     <string name="widget_tap_to_reconnect">点击重连</string>
     <string name="your_mac">你的 Mac</string>
-    <string name="mac_media_channel_name">Mac 媒体播放器</string>
-    <string name="mac_media_playing_on_mac">正在 Mac 上播放</string>
-    <string name="mac_media_previous">上一曲</string>
-    <string name="mac_media_pause">暂停</string>
-    <string name="mac_media_play">播放</string>
-    <string name="mac_media_next">下一曲</string>
     <string name="quickshare_channel_name">快传</string>
     <string name="quickshare_active">快传服务运行中</string>
     <string name="quickshare_pin_waiting">配对码：%1$s - 等待文件…</string>
@@ -366,7 +348,13 @@
         <item>已拷贝</item>
         <item>copied</item>
     </string-array>
-    <string name="notif_usb_title">AirSync · USB</string>
-    <string name="notif_usb_connecting">正在通过 USB 验证 Mac…</string>
-    <string name="connected_usb">已连接 · USB</string>
+    <string name="notif_usb_title">AirSync · ADB</string>
+    <string name="notif_usb_connecting">正在通过 ADB 验证 Mac…</string>
+    <string name="connected_usb">已连接 · ADB</string>
+    <string name="system_volume">Mac 系统音量</string>
+    <string name="volume_down">降低音量</string>
+    <string name="volume_up">提高音量</string>
+    <string name="toggle_mute">切换静音</string>
+    <string name="ui_files">文件</string>
+    <string name="ui_file_sharing_and_access">文件分享与访问</string>
 </resources>

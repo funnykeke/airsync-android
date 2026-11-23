@@ -254,6 +254,8 @@ fun RemoteControlScreen(
 
     @Composable
     fun ExtraKeys() {
+        // System volume remains independent of playback synchronization.
+        com.sameerasw.airsync.presentation.ui.components.SystemVolumeControls()
         // Extra Keys
         FlowRow(
             modifier = Modifier

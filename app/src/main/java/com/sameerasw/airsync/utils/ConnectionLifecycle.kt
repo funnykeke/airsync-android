@@ -28,11 +28,12 @@ class ConnectionLifecycle {
 object TransportCapabilities {
     private val relayMessages = setOf(
         "device", "macInfo", "appList", "appIcons", "notification", "notificationUpdate", "notificationAction", "dismissNotification",
-        "dismissalResponse", "notificationActionResponse", "clipboardUpdate", "status", "macMediaControl", "mediaControl",
-        "mediaControlResponse", "macMediaControlResponse", "volumeControl", "volumeControlResponse", "macVolume", "ping", "pong", "userDisconnected",
-        "disconnectRequest", "toggleAppNotif", "toggleAppNotifResponse", "toggleNowPlaying", "toggleNowPlayingResponse"
+        "dismissalResponse", "notificationActionResponse", "clipboardUpdate", "status",
+        "volumeControl", "volumeControlResponse", "macVolume", "ping", "pong", "userDisconnected",
+        "disconnectRequest", "toggleAppNotif", "toggleAppNotifResponse"
     )
-    fun allows(mode: String, type: String) = mode in setOf("local", "usb") || type in relayMessages
+    private val removedPlaybackMessages = setOf("mediaControl", "mediaControlResponse", "macMediaControl", "macMediaControlResponse", "toggleNowPlaying", "toggleNowPlayingResponse")
+    fun allows(mode: String, type: String) = type !in removedPlaybackMessages && (mode in setOf("local", "usb") || type in relayMessages)
     fun validKey(value: String?): Boolean = try {
         value != null && java.util.Base64.getDecoder().decode(value.trim()).size in setOf(16, 24, 32)
     } catch (_: IllegalArgumentException) { false }

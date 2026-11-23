@@ -36,7 +36,6 @@ class AirSyncRepositoryImpl(
     }
 
 
-
     override suspend fun setPermissionsChecked(checked: Boolean) {
         dataStoreManager.setPermissionsChecked(checked)
     }
@@ -161,21 +160,7 @@ class AirSyncRepositoryImpl(
     }
 
     // New: Send now playing setting
-    override suspend fun setSendNowPlayingEnabled(enabled: Boolean) {
-        dataStoreManager.setSendNowPlayingEnabled(enabled)
-    }
 
-    override fun getSendNowPlayingEnabled(): Flow<Boolean> {
-        return dataStoreManager.getSendNowPlayingEnabled()
-    }
-
-    override suspend fun setExcludedMediaPackages(packages: Set<String>) {
-        dataStoreManager.setExcludedMediaPackages(packages)
-    }
-
-    override fun getExcludedMediaPackages(): Flow<Set<String>> {
-        return dataStoreManager.getExcludedMediaPackages()
-    }
 
     // New: Keep previous link setting
     override suspend fun setKeepPreviousLinkEnabled(enabled: Boolean) {
@@ -185,7 +170,6 @@ class AirSyncRepositoryImpl(
     override fun getKeepPreviousLinkEnabled(): Flow<Boolean> {
         return dataStoreManager.getKeepPreviousLinkEnabled()
     }
-
 
 
     override suspend fun setUserManuallyDisconnected(disconnected: Boolean) {
@@ -204,13 +188,6 @@ class AirSyncRepositoryImpl(
         return dataStoreManager.isAppPaused()
     }
 
-    override suspend fun setMacMediaControlsEnabled(enabled: Boolean) {
-        dataStoreManager.setMacMediaControlsEnabled(enabled)
-    }
-
-    override fun getMacMediaControlsEnabled(): Flow<Boolean> {
-        return dataStoreManager.getMacMediaControlsEnabled()
-    }
 
     override suspend fun setUseBlurEnabled(enabled: Boolean) {
         dataStoreManager.setUseBlurEnabled(enabled)
@@ -245,7 +222,6 @@ class AirSyncRepositoryImpl(
     }
 
 
-
     override suspend fun setWidgetTransparency(alpha: Float) {
         dataStoreManager.setWidgetTransparency(alpha)
     }
@@ -269,11 +245,6 @@ class AirSyncRepositoryImpl(
     override fun getDeviceDiscoveryEnabled(): Flow<Boolean> {
         return dataStoreManager.getDeviceDiscoveryEnabled()
     }
-
-
-
-
-
 
 
     override suspend fun setQuickShareEnabled(enabled: Boolean) {

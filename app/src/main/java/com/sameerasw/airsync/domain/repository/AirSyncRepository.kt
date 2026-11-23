@@ -70,12 +70,6 @@ interface AirSyncRepository {
     suspend fun setContinueBrowsingEnabled(enabled: Boolean)
     fun getContinueBrowsingEnabled(): Flow<Boolean>
 
-    // Send now playing settings
-    suspend fun setSendNowPlayingEnabled(enabled: Boolean)
-    fun getSendNowPlayingEnabled(): Flow<Boolean>
-
-    suspend fun setExcludedMediaPackages(packages: Set<String>)
-    fun getExcludedMediaPackages(): Flow<Set<String>>
 
     // Keep previous link settings
     suspend fun setKeepPreviousLinkEnabled(enabled: Boolean)
@@ -90,9 +84,6 @@ interface AirSyncRepository {
     suspend fun setAppPaused(paused: Boolean)
     fun isAppPaused(): Flow<Boolean>
 
-    // Mac Media controls
-    suspend fun setMacMediaControlsEnabled(enabled: Boolean)
-    fun getMacMediaControlsEnabled(): Flow<Boolean>
 
     // Blur settings
     suspend fun setUseBlurEnabled(enabled: Boolean)
@@ -109,7 +100,6 @@ interface AirSyncRepository {
     // Default tab settings
     suspend fun setDefaultTab(tab: String)
     fun getDefaultTab(): Flow<String>
-
 
 
     // Widget specific settings

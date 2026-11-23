@@ -4,43 +4,28 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
-import android.graphics.Bitmap
-import android.media.MediaMetadata
-import android.media.Rating
-import android.media.session.MediaController
-import android.media.session.MediaSessionManager
-import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import android.util.Base64
 import android.util.Log
 import com.sameerasw.airsync.data.local.DataStoreManager
-import com.sameerasw.airsync.domain.model.MediaInfo
-import com.sameerasw.airsync.utils.MediaTimeline
 import com.sameerasw.airsync.utils.JsonUtil
 import com.sameerasw.airsync.utils.NotificationDismissalUtil
 import com.sameerasw.airsync.utils.NotificationListenerRecovery
 import com.sameerasw.airsync.utils.PermissionUtil
-import com.sameerasw.airsync.utils.SyncManager
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 import java.util.LinkedList
-import java.util.concurrent.atomic.AtomicLong
 
+/** Historical component name preserves existing notification access grants after upgrading. */
 class MediaNotificationListener : NotificationListenerService() {
 
     companion object {
-        @Volatile
-        private var currentMediaInfo: MediaInfo? = null
-
         @Volatile
         private var serviceInstance: MediaNotificationListener? = null
         private const val TAG = "MediaNotificationListener"
@@ -71,77 +56,12 @@ class MediaNotificationListener : NotificationListenerService() {
             }
         }
 
-        // Flag to pause media listener when receiving playing media from Mac
-        @Volatile
-        private var isMediaListenerPaused = false
-
-        // New: global toggle for now playing reporting
-        @Volatile
-        private var isNowPlayingEnabled: Boolean = false
-        private val mediaPreferenceRevision = AtomicLong(0)
-
-        // Excluded media packages
-        @Volatile
-        private var excludedMediaPackages: Set<String> = emptySet()
-
-        fun setExcludedMediaPackages(packages: Set<String>) {
-            excludedMediaPackages = packages
-            Log.d(TAG, "Updated excluded media packages: ${packages.size} apps excluded")
-        }
-
-        fun setNowPlayingEnabled(context: Context, enabled: Boolean) {
-            mediaPreferenceRevision.incrementAndGet()
-            isNowPlayingEnabled = enabled
-            if (!enabled) {
-                // Clear cached media and pause listener
-                currentMediaInfo = null
-                isMediaListenerPaused = true
-                Log.d(TAG, "Now playing disabled: pausing media listener and clearing cache")
-            } else {
-                isMediaListenerPaused = false
-                Log.d(TAG, "Now playing enabled: resuming media listener")
-            }
-            Handler(Looper.getMainLooper()).post {
-                serviceInstance?.applyMediaObservationPreference()
-            }
-            // Trigger a status sync to reflect change
-            SyncManager.checkAndSyncDeviceStatus(context, forceSync = true)
-        }
-
-        fun hasSignificantMediaChange(old: MediaInfo?, new: MediaInfo?): Boolean {
-            if (old == null && new == null) return false
-            if (old == null || new == null) return true
-            return old.isPlaying != new.isPlaying ||
-                   old.title != new.title ||
-                   old.artist != new.artist ||
-                   old.albumArt != new.albumArt ||
-                   old.albumArtLite != new.albumArtLite ||
-                   old.durationMs != new.durationMs ||
-                   old.isBuffering != new.isBuffering ||
-                   old.playbackRate != new.playbackRate ||
-                   kotlin.math.abs(new.positionMs - MediaTimeline.positionAt(
-                       old.positionMs, old.positionTimestampMs, new.positionTimestampMs,
-                       old.isPlaying && !old.isBuffering, old.playbackRate, new.durationMs
-                   )) > 1_000L ||
-                   old.likeStatus != new.likeStatus
-        }
-
-        // In-memory cache of like status per track key
-        private val likeStatusCache = LinkedHashMap<String, String>(32, 0.75f, true)
-
-        // System packages to ignore
         private val SYSTEM_PACKAGES = setOf(
             "android",
             "com.android.systemui",
             "com.android.providers.downloads",
             "com.google.android.gms",
             "com.android.vending"
-        )
-
-        // Only attach like status for these media apps
-        private val ALLOWED_PACKAGES = setOf(
-            "com.google.android.apps.youtube.music", // YouTube Music
-            "com.spotify.music" // Spotify
         )
 
         fun getInstance(): MediaNotificationListener? {
@@ -165,340 +85,13 @@ class MediaNotificationListener : NotificationListenerService() {
             }
         }
 
-        fun getMediaInfo(context: Context): MediaInfo {
-            // Respect global toggle; if disabled, return empty media
-            if (!isNowPlayingEnabled) {
-                return MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
-            }
-            return try {
-                val mediaSessionManager =
-                    context.getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
-
-                val componentName = ComponentName(context, MediaNotificationListener::class.java)
-
-                val activeSessions = try {
-                    mediaSessionManager.getActiveSessions(componentName)
-                } catch (e: SecurityException) {
-                    Log.w(TAG, "SecurityException getting active sessions: ${e.message}")
-                    emptyList()
-                }
-
-                // Log.d(TAG, "Found ${activeSessions.size} active media sessions")
-
-                if (activeSessions.isNotEmpty()) {
-                    for (controller in activeSessions) {
-                        try {
-                            if (controller.packageName == context.packageName || excludedMediaPackages.contains(controller.packageName)) {
-                                continue
-                            }
-                        } catch (_: Exception) {
-                        }
-
-                        val metadata = controller.metadata
-                        val playbackState = controller.playbackState
-
-                        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
-                        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
-                        val isPlaying = playbackState?.state == PlaybackState.STATE_PLAYING
-                        val durationMs =
-                            metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
-                        // PlaybackState.position belongs to lastPositionUpdateTime
-                        // (elapsedRealtime), not the wall time when we query it.
-                        val playbackRate = playbackState?.playbackSpeed?.toDouble() ?: 1.0
-                        val positionTimestampMs = System.currentTimeMillis()
-                        val positionMs = MediaTimeline.positionAt(
-                            playbackState?.position ?: 0L,
-                            playbackState?.lastPositionUpdateTime ?: 0L,
-                            android.os.SystemClock.elapsedRealtime(),
-                            isPlaying, playbackRate, durationMs
-                        )
-                        val isBuffering = when (playbackState?.state) {
-                            PlaybackState.STATE_BUFFERING,
-                            PlaybackState.STATE_CONNECTING -> true
-
-                            else -> false
-                        }
-
-                        val albumArtBitmap =
-                            metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-                                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-
-                        val albumArtBase64 = albumArtBitmap?.let {
-                            val outputStream = ByteArrayOutputStream()
-                            // Compress to a smaller size to avoid large payloads
-                            it.compress(Bitmap.CompressFormat.JPEG, 50, outputStream)
-                            Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-                        }
-
-                        val albumArtLiteBase64 = albumArtBitmap?.let {
-                            try {
-                                val outputStream = ByteArrayOutputStream()
-                                val scaled = Bitmap.createScaledBitmap(it, 80, 80, true)
-                                scaled.compress(Bitmap.CompressFormat.JPEG, 30, outputStream)
-                                Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-                            } catch (e: Exception) {
-                                null
-                            }
-                        }
-
-
-                        // Log.d(TAG, "Media session - Title: $title, Artist: $artist, Playing: $isPlaying, State: ${playbackState?.state}")
-
-                        // Determine like status; apply app filter and strict positive-only like detection
-                        val (detectedStatus, source) = determineLikeStatusWithSource(
-                            context,
-                            controller
-                        )
-                        var likeStatus = detectedStatus
-
-                        // If filtered by app, force none and skip cache
-                        if (source == "appfilter") {
-                            likeStatus = "none"
-                        }
-
-                        // Return the first session that has media info or is playing
-                        if (title.isNotEmpty() || artist.isNotEmpty() || isPlaying) {
-                            return MediaInfo(
-                                isPlaying = isPlaying,
-                                title = title,
-                                artist = artist,
-                                albumArt = albumArtBase64,
-                                albumArtLite = albumArtLiteBase64,
-                                durationMs = durationMs,
-                                positionMs = positionMs,
-                                positionTimestampMs = positionTimestampMs,
-                                isBuffering = isBuffering,
-                                likeStatus = likeStatus,
-                                playbackRate = playbackRate
-                            )
-                        }
-                    }
-                }
-
-                // Return current cached info if no active sessions but we have cached data
-                currentMediaInfo?.let { cached ->
-                    if (cached.title.isNotEmpty() || cached.artist.isNotEmpty()) {
-                        Log.d(TAG, "Using cached media info")
-                        return cached.copy(isPlaying = false)
-                    }
-                }
-
-                // Log.d(TAG, "No media info found")
-                MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error getting media info: ${e.message}")
-                MediaInfo(false, "", "", null, null, 0L, 0L, 0L, false, "none")
-            }
-        }
-
-        private fun determineLikeStatusWithSource(
-            context: Context,
-            controller: MediaController
-        ): Pair<String, String> {
-            // Enforce package filter first
-            val pkg = controller.packageName
-            if (pkg.isNullOrEmpty() || !ALLOWED_PACKAGES.contains(pkg)) {
-                return "none" to "appfilter"
-            }
-
-            try {
-                val md = controller.metadata
-                // Prefer explicit user rating/heart/thumbs metadata if present
-                val userRating: Rating? = try {
-                    md?.getRating(MediaMetadata.METADATA_KEY_USER_RATING)
-                } catch (_: Exception) {
-                    null
-                }
-                val rating: Rating? = userRating ?: try {
-                    md?.getRating(MediaMetadata.METADATA_KEY_RATING)
-                } catch (_: Exception) {
-                    null
-                }
-                if (rating != null) {
-                    if (rating.isRated) {
-                        when (rating.ratingStyle) {
-                            Rating.RATING_HEART -> {
-                                val liked = try {
-                                    rating.hasHeart()
-                                } catch (_: Exception) {
-                                    false
-                                }
-                                Log.d(TAG, "Like from HEART rating: $liked")
-                                return if (liked) "liked" to "rating" else "not_liked" to "rating"
-                            }
-
-                            Rating.RATING_THUMB_UP_DOWN -> {
-                                val up = try {
-                                    rating.isThumbUp
-                                } catch (_: Exception) {
-                                    false
-                                }
-                                Log.d(TAG, "Like from THUMB rating: $up")
-                                return if (up) "liked" to "rating" else "not_liked" to "rating"
-                            }
-
-                            else -> Log.d(
-                                TAG,
-                                "Rating present but not mappable (style=${rating.ratingStyle})"
-                            )
-                        }
-                    } else {
-                        // Not rated counts as not_liked per requirement
-                        Log.d(TAG, "Rating present but not rated -> not_liked")
-                        return "not_liked" to "rating"
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to read metadata rating: ${e.message}")
-            }
-
-            // For allowed apps: if no positive rating, treat as not_liked
-            return "not_liked" to "rating"
-        }
-
-        private fun detectLikeStatusForPackage(targetPackage: String?): String {
-            val service = getInstance() ?: return "none"
-            val notifs = try {
-                service.activeNotifications
-            } catch (_: Exception) {
-                emptyArray<StatusBarNotification>()
-            }
-            if (notifs.isEmpty()) return "none"
-
-            // Look for notification from the target package first, then others
-            val candidates =
-                notifs.filter { it.packageName == targetPackage } + notifs.filter { it.packageName != targetPackage }
-
-            for (sbn in candidates) {
-                val n = sbn.notification
-                val actions = n.actions ?: continue
-                // Debug log action titles and semantic actions for inspection
-                try {
-                    actions.forEachIndexed { idx, act ->
-                        Log.d(
-                            TAG,
-                            "Notif action[$idx]: title='${act.title}', semantic=${act.semanticAction}"
-                        )
-                    }
-                } catch (_: Exception) {
-                }
-                val status = inferLikeStatusFromActions(actions)
-                if (status != null) return status
-            }
-            return "none"
-        }
-
-        private fun inferLikeStatusFromActions(actions: Array<Notification.Action>): String? {
-            // Priority 1: explicit text indicating Unlike/Remove -> liked
-            for (action in actions) {
-                val title = action.title?.toString()?.lowercase()?.trim() ?: ""
-                if (title.isEmpty()) continue
-                if (title.contains("unlike") || title.contains("remove from liked") || title.contains(
-                        "remove like"
-                    ) || title == "liked"
-                ) {
-                    return "liked"
-                }
-            }
-            // Priority 2: semantic thumbs up/down if titles are missing
-            for (action in actions) {
-                val sem = action.semanticAction
-                if (sem == Notification.Action.SEMANTIC_ACTION_THUMBS_DOWN) {
-                    return "liked" // apps often show "unlike" when already liked
-                }
-            }
-            for (action in actions) {
-                val title = action.title?.toString()?.lowercase()?.trim() ?: ""
-                val sem = action.semanticAction
-                if (title.contains("like") || title.contains("favorite") || title.contains("favourite") ||
-                    title.contains("❤") || title.contains("♥") ||
-                    sem == Notification.Action.SEMANTIC_ACTION_THUMBS_UP
-                ) {
-                    return "not_liked"
-                }
-            }
-            return null
-        }
-
-        // Build a track key using most stable metadata available
-        private fun buildTrackKey(controller: MediaController): String? {
-            return try {
-                val pkg = controller.packageName ?: return null
-                val md = controller.metadata ?: return null
-                val mediaId = md.getString(MediaMetadata.METADATA_KEY_MEDIA_ID)
-                val title = md.getString(MediaMetadata.METADATA_KEY_TITLE) ?: ""
-                val artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: ""
-                val album = md.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: ""
-                val base = if (!mediaId.isNullOrEmpty()) mediaId else listOf(
-                    title,
-                    artist,
-                    album
-                ).joinToString("|")
-                if (base.isBlank()) null else "$pkg|$base"
-            } catch (_: Exception) {
-                null
-            }
-        }
-
-        private fun getCachedLikeStatusFor(controller: MediaController): String {
-            val key = buildTrackKey(controller) ?: return "none"
-            synchronized(likeStatusCache) {
-                return likeStatusCache[key] ?: "none"
-            }
-        }
-
-        private fun updateCachedLikeStatusFor(controller: MediaController, status: String) {
-            val key = buildTrackKey(controller) ?: return
-            synchronized(likeStatusCache) {
-                likeStatusCache[key] = status
-                // Trim cache to 100 entries
-                if (likeStatusCache.size > 100) {
-                    val it = likeStatusCache.entries.iterator()
-                    if (it.hasNext()) {
-                        it.next()
-                        it.remove()
-                    }
-                }
-            }
-        }
-
-        // Public helpers for other components
-        fun setCachedLikeStatusForCurrent(context: Context, status: String): Boolean {
-            return try {
-                val msm = context.getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
-                val componentName = ComponentName(context, MediaNotificationListener::class.java)
-                val sessions = try {
-                    msm.getActiveSessions(componentName)
-                } catch (_: Exception) {
-                    emptyList()
-                }
-                val controller =
-                    sessions.firstOrNull { it.playbackState?.actions != 0L } ?: return false
-                updateCachedLikeStatusFor(controller, status)
-                true
-            } catch (_: Exception) {
-                false
-            }
-        }
-
-        fun pauseMediaListener() {
-            isMediaListenerPaused = true
-            Log.d(TAG, "Media listener paused - receiving playing media from Mac")
-        }
-
-        fun resumeMediaListener() {
-            // Don't resume if globally disabled
-            if (!isNowPlayingEnabled) return
-            isMediaListenerPaused = false
-            Log.d(TAG, "Media listener resumed")
-        }
     }
 
     private var serviceJob = kotlinx.coroutines.SupervisorJob()
     private var serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
     private lateinit var dataStoreManager: DataStoreManager
 
-    // Cache to store last 5 notifications
+    // Cache the most recent notification to suppress duplicate delivery.
     private val notificationCache = LinkedList<Pair<String, String>>()
     private val maxCache = 1
 
@@ -506,24 +99,6 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onCreate()
         dataStoreManager = DataStoreManager(this)
         serviceInstance = this
-
-        // Load the persisted now playing setting
-        val initialRevision = mediaPreferenceRevision.get()
-        serviceScope.launch {
-            try {
-                val enabled = dataStoreManager.getSendNowPlayingEnabled().first()
-                Handler(Looper.getMainLooper()).post {
-                    // A setting change while the read was in flight wins.
-                    if (serviceInstance !== this@MediaNotificationListener ||
-                        !serviceJob.isActive || mediaPreferenceRevision.get() != initialRevision) return@post
-                    isNowPlayingEnabled = enabled
-                    isMediaListenerPaused = !enabled
-                    applyMediaObservationPreference()
-                }
-                Log.d(TAG, "Initialized now playing setting: $enabled")
-            } catch (_: Exception) {
-            }
-        }
     }
 
     override fun onListenerConnected() {
@@ -568,75 +143,11 @@ class MediaNotificationListener : NotificationListenerService() {
             Log.e(TAG, "Failed to restore active notifications on listener connect", e)
         }
 
-        applyMediaObservationPreference()
         syncActiveNotifications()
-    }
-
-    private var observedSessionManager: MediaSessionManager? = null
-    private val observedControllers = mutableListOf<Pair<MediaController, MediaController.Callback>>()
-    private val activeSessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-        observeMediaSessions(controllers)
-        syncMediaSessionChange()
-    }
-
-    private fun observeMediaSessions(controllers: List<MediaController>?) {
-        observedControllers.forEach { (controller, callback) -> controller.unregisterCallback(callback) }
-        observedControllers.clear()
-        if (!isNowPlayingEnabled || !listenerConnected) return
-        controllers.orEmpty().filter { it.packageName != packageName }.forEach { controller ->
-            val callback = object : MediaController.Callback() {
-                override fun onPlaybackStateChanged(state: PlaybackState?) = syncMediaSessionChange()
-                override fun onMetadataChanged(metadata: MediaMetadata?) = syncMediaSessionChange()
-            }
-            controller.registerCallback(callback, android.os.Handler(mainLooper))
-            observedControllers.add(controller to callback)
-        }
-    }
-
-    private fun syncMediaSessionChange() {
-        if (!WebSocketUtil.isConnected() || isMediaListenerPaused || !isNowPlayingEnabled) return
-        val previous = currentMediaInfo
-        currentMediaInfo = getMediaInfo(this)
-        if (hasSignificantMediaChange(previous, currentMediaInfo)) {
-            // A real session callback is authoritative, including small seeks;
-            // do not filter it through the periodic sync's five-second threshold.
-            SyncManager.checkAndSyncDeviceStatus(this, forceSync = true)
-        }
-    }
-
-    private fun startMediaSessionObservation() {
-        stopMediaSessionObservation()
-        if (!isNowPlayingEnabled || !listenerConnected) return
-        try {
-            val manager = getSystemService(MEDIA_SESSION_SERVICE) as MediaSessionManager
-            val component = ComponentName(this, MediaNotificationListener::class.java)
-            manager.addOnActiveSessionsChangedListener(activeSessionsListener, component, android.os.Handler(mainLooper))
-            observedSessionManager = manager
-            observeMediaSessions(manager.getActiveSessions(component))
-        } catch (e: SecurityException) {
-            Log.w(TAG, "Media session observation unavailable: ${e.message}")
-        }
-    }
-
-    private fun stopMediaSessionObservation() {
-        observedSessionManager?.removeOnActiveSessionsChangedListener(activeSessionsListener)
-        observedSessionManager = null
-        observeMediaSessions(emptyList())
-    }
-
-    private fun applyMediaObservationPreference() {
-        if (!isNowPlayingEnabled || !listenerConnected) {
-            stopMediaSessionObservation()
-            currentMediaInfo = null
-            return
-        }
-        if (observedSessionManager == null) startMediaSessionObservation()
-        if (!isMediaListenerPaused) syncMediaSessionChange()
     }
 
     override fun onListenerDisconnected() {
         listenerConnected = false
-        stopMediaSessionObservation()
         super.onListenerDisconnected()
         Log.d(TAG, "Notification listener disconnected")
 
@@ -645,7 +156,6 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     override fun onDestroy() {
-        stopMediaSessionObservation()
         serviceJob.cancel()
         if (serviceInstance === this) {
             listenerConnected = false
@@ -656,37 +166,9 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         super.onNotificationPosted(sbn)
-        if (!WebSocketUtil.isConnected()) {
-            return
-        }
-        sbn?.let { notification ->
-            Log.d(
-                TAG,
-                "Notification posted: ${notification.packageName}"
-            )
-
-            // Skip media processing if media listener is paused or globally disabled
-            if (!isMediaListenerPaused && isNowPlayingEnabled) {
-                // Update media info and check for changes (includes like status)
-                val previousMediaInfo = currentMediaInfo
-                updateMediaInfo()
-
-                // If media info changed, trigger sync
-                if (hasSignificantMediaChange(previousMediaInfo, currentMediaInfo)) {
-                    Log.d(TAG, "Media info changed, triggering sync")
-                    SyncManager.onMediaStateChanged(this)
-                }
-            } else {
-                Log.d(
-                    TAG,
-                    "Media listener paused/disabled - skipping media state change processing"
-                )
-            }
-
-            // Always process notification for sync (non-media notifications)
-            processNotificationForSync(notification)
-        }
+        if (WebSocketUtil.isConnected()) sbn?.let { processNotificationForSync(it) }
     }
+
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
@@ -698,24 +180,6 @@ class MediaNotificationListener : NotificationListenerService() {
 
     private fun handleNotificationRemoval(sbn: StatusBarNotification) {
         Log.d(TAG, "Notification removed: ${sbn.packageName}")
-
-        // Skip media processing if media listener is paused or globally disabled
-        if (!isMediaListenerPaused && isNowPlayingEnabled) {
-            // Update media info and check for changes
-            val previousMediaInfo = currentMediaInfo
-            updateMediaInfo()
-
-            // If media info changed, trigger sync
-            if (hasSignificantMediaChange(previousMediaInfo, currentMediaInfo)) {
-                Log.d(TAG, "Media info changed after notification removal, triggering sync")
-                SyncManager.onMediaStateChanged(this)
-            }
-        } else {
-            Log.d(
-                TAG,
-                "Media listener paused/disabled - skipping media state change processing after removal"
-            )
-        }
 
         // Sync dismissal to Mac
         serviceScope.launch {
@@ -784,7 +248,7 @@ class MediaNotificationListener : NotificationListenerService() {
                     return@launch
                 }
 
-                // Skip system notifications and media-only notifications
+                // Skip system notifications
                 if (shouldSkipNotification(sbn)) {
                     Log.d(TAG, "Skipping notification from ${sbn.packageName}")
                     return@launch
@@ -912,10 +376,6 @@ class MediaNotificationListener : NotificationListenerService() {
         }
     }
 
-    private fun updateMediaInfo() {
-        currentMediaInfo = getMediaInfo(this)
-        Log.d(TAG, "Updated media info: $currentMediaInfo")
-    }
 
     private fun isDuplicateNotification(packageName: String, body: String?): Boolean {
         if (body == null) return false

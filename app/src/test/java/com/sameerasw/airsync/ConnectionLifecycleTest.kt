@@ -62,11 +62,21 @@ class ConnectionLifecycleTest {
         assertFalse(c.retryAllowed(token, "relay", false, false))
         assertTrue(c.retryAllowed(token, "relay", false, true))
     }
-    @Test fun relayAcceptsMediaButRejectsPrivilegedAndUnknownMessages() {
-        for (type in listOf("device", "macInfo", "appList", "appIcons", "notification", "notificationAction", "dismissNotification", "clipboardUpdate", "status", "macMediaControl", "macMediaControlResponse", "mediaControl")) assertTrue(type, TransportCapabilities.allows("relay", type))
+    @Test fun relayAcceptsStatusButRejectsPrivilegedAndUnknownMessages() {
+        for (type in listOf("device", "macInfo", "appList", "appIcons", "notification", "notificationAction", "dismissNotification", "clipboardUpdate", "status")) assertTrue(type, TransportCapabilities.allows("relay", type))
         for (type in listOf("remoteControl", "browseLs", "startQuickShare", "clipboardImage", "fileChunk", "unknown")) assertFalse(type, TransportCapabilities.allows("relay", type))
         assertTrue(TransportCapabilities.allows("local", "remoteControl"))
     }
+@Test fun playbackProtocolIsRejectedOnEveryTransportWhileSystemVolumeRemains() {
+    for (mode in listOf("local", "usb", "relay")) {
+        for (type in listOf("mediaControl", "mediaControlResponse", "macMediaControl", "macMediaControlResponse", "toggleNowPlaying", "toggleNowPlayingResponse")) {
+            assertFalse("$mode accepted $type", TransportCapabilities.allows(mode, type))
+        }
+        for (type in listOf("status", "volumeControl", "volumeControlResponse", "macVolume")) {
+            assertTrue("$mode rejected $type", TransportCapabilities.allows(mode, type))
+        }
+    }
+}
     @Test fun encryptionKeyMustBeValidAesMaterial() {
         assertFalse(TransportCapabilities.validKey(null))
         assertFalse(TransportCapabilities.validKey(""))

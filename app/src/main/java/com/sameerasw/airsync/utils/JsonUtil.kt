@@ -1,24 +1,13 @@
 package com.sameerasw.airsync.utils
 
-import com.sameerasw.airsync.domain.model.AudioInfo
+import com.sameerasw.airsync.domain.model.SystemVolume
 import com.sameerasw.airsync.domain.model.BatteryInfo
 
 object JsonUtil {
+    /** Status contains battery, pairing and independent system volume only. */
+    fun createDeviceStatusJson(battery: BatteryInfo, volume: SystemVolume): String =
+        """{"type":"status","data":{"battery":{"level":${battery.level},"isCharging":${battery.isCharging}},"isPaired":true,"volume":{"level":${volume.level.coerceIn(0, 100)},"isMuted":${volume.isMuted}}}}"""
 
-    /** Serialize the already captured snapshot; never query media again here. */
-    fun createDeviceStatusJson(battery: BatteryInfo, audio: AudioInfo, includeNowPlaying: Boolean): String {
-        // The preference may have changed after capture. Strip all media at
-        // serialization as well, retaining battery, volume and pairing status.
-        val media = if (includeNowPlaying) audio else AudioInfo(false, "", "", audio.volume, audio.isMuted)
-        return createDeviceStatusJson(
-            batteryLevel = battery.level, isCharging = battery.isCharging, isPaired = true,
-            isPlaying = media.isPlaying, title = media.title, artist = media.artist,
-            volume = audio.volume, isMuted = audio.isMuted, albumArt = media.albumArt,
-            albumArtLite = media.albumArtLite, duration = media.durationMs,
-            position = media.positionMs, positionTimestamp = media.positionTimestampMs,
-            isBuffering = media.isBuffering, likeStatus = media.likeStatus, playbackRate = media.playbackRate
-        )
-    }
 
     /**
      * Ensures JSON string is a single line by removing all newlines and extra whitespace
@@ -169,32 +158,6 @@ object JsonUtil {
         return sb.toString()
     }
 
-    /**
-     * Creates a single-line JSON string for device status with media playing state
-     */
-    fun createDeviceStatusJson(
-        batteryLevel: Int,
-        isCharging: Boolean,
-        isPaired: Boolean,
-        isPlaying: Boolean,
-        title: String,
-        artist: String,
-        volume: Int,
-        isMuted: Boolean,
-        albumArt: String?,
-        albumArtLite: String? = null,
-        duration: Long = 0L,
-        position: Long = 0L,
-        positionTimestamp: Long = 0L,
-        isBuffering: Boolean = false,
-        likeStatus: String,
-        playbackRate: Double = 1.0
-    ): String {
-        val albumArtJson = if (albumArt != null) ",\"albumArt\":\"$albumArt\"" else ""
-        val albumArtLiteJson =
-            if (albumArtLite != null) ",\"albumArtLite\":\"$albumArtLite\"" else ""
-        return """{"type":"status","data":{"battery":{"level":$batteryLevel,"isCharging":$isCharging},"isPaired":$isPaired,"music":{"isPlaying":$isPlaying,"title":"${escape(title)}","artist":"${escape(artist)}","volume":$volume,"isMuted":$isMuted$albumArtJson$albumArtLiteJson,"duration":$duration,"position":$position,"positionTimestamp":$positionTimestamp,"playbackRate":${if (playbackRate.isFinite()) playbackRate else 1.0},"isBuffering":$isBuffering,"likeStatus":"$likeStatus"}}}"""
-    }
 
     /**
      * Creates a response JSON for notification dismissal result
@@ -223,12 +186,6 @@ object JsonUtil {
         }","success":$success,"message":"${escape(message)}"}}"""
     }
 
-    /**
-     * Creates a response JSON for media control result
-     */
-    fun createMediaControlResponse(action: String, success: Boolean, message: String = ""): String {
-        return """{"type":"mediaControlResponse","data":{"action":"$action","success":$success,"message":"${escape(message)}"}}"""
-    }
 
     /**
      * Creates a response JSON for volume control result
@@ -283,19 +240,5 @@ object JsonUtil {
         return """{"type":"toggleAppNotifResponse","data":{"package":"$packageName","success":$success,"newState":$newState,"message":"${escape(message)}"}}"""
     }
 
-    /**
-     * Creates a response JSON for toggleNowPlaying command
-     */
-    fun createToggleNowPlayingResponse(
-        success: Boolean,
-        newState: Boolean?,
-        message: String = ""
-    ): String {
-        val statePart = newState?.let { ",\"state\":$it" } ?: ""
-        return """{"type":"toggleNowPlayingResponse","data":{"success":$success$statePart,"message":"${
-            escape(
-                message
-            )
-        }"}}"""
-    }
+
 }

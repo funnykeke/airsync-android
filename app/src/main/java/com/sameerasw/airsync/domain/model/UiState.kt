@@ -23,10 +23,7 @@ data class UiState(
     val symmetricKey: String? = null,
     val manualPcName: String = "",
     val isContinueBrowsingEnabled: Boolean = true,
-    val isSendNowPlayingEnabled: Boolean = true,
-    val excludedMediaPackages: Set<String> = emptySet(),
     val isKeepPreviousLinkEnabled: Boolean = true,
-    val isMacMediaControlsEnabled: Boolean = true,
     // 中转模式
     val transportMode: String = "local",
     val effectiveTransportMode: String = "local",
@@ -43,7 +40,7 @@ data class UiState(
     // Clipboard history
     val isClipboardHistoryEnabled: Boolean = true,
     val clipboardHistory: List<ClipboardEntry> = emptyList(),
-    val defaultTab: String = "dynamic",
+    val defaultTab: String = "connect",
     val activeIp: String? = null,
     val connectingDeviceId: String? = null,
     val isDeviceDiscoveryEnabled: Boolean = true,

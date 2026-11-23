@@ -2,6 +2,7 @@ package com.sameerasw.airsync.utils
 
 import com.sameerasw.airsync.R
 import FileBrowserUtil
+import kotlinx.coroutines.flow.asStateFlow
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -9,7 +10,6 @@ import android.widget.Toast
 import com.sameerasw.airsync.BuildConfig
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.data.repository.AirSyncRepositoryImpl
-import com.sameerasw.airsync.service.MediaNotificationListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -24,8 +24,6 @@ import org.json.JSONObject
 object WebSocketMessageHandler {
     private const val TAG = "WebSocketMessageHandler"
 
-    // Track if we're currently receiving playing media from Mac to prevent feedback loop
-    private var isReceivingPlayingMedia = false
 
     // Callback for clipboard entry history tracking
     private var onClipboardEntryReceived: ((text: String) -> Unit)? = null
@@ -38,14 +36,9 @@ object WebSocketMessageHandler {
         )
     }
 
-    // Callback for volume updates (0-100)
-    private var onMacVolumeReceived: ((Int) -> Unit)? = null
+    private val _macSystemVolume = kotlinx.coroutines.flow.MutableStateFlow<Int?>(null)
+    val macSystemVolume = _macSystemVolume.asStateFlow()
 
-    fun setOnMacVolumeCallback(callback: ((Int) -> Unit)?) {
-        onMacVolumeReceived = callback
-    }
-
-    // Callback for modifier status updates
     private var onModifierStatusReceived: ((JSONObject) -> Unit)? = null
 
     fun setOnModifierStatusCallback(callback: ((JSONObject) -> Unit)?) {
@@ -75,18 +68,11 @@ object WebSocketMessageHandler {
             when (type) {
                 "clipboardUpdate" -> handleClipboardUpdate(context, data)
                 "volumeControl" -> handleVolumeControl(context, data)
-                "mediaControl" -> handleMediaControl(context, data)
                 "dismissNotification" -> handleNotificationDismissal(data)
                 "notificationAction" -> handleNotificationAction(data)
                 "disconnectRequest" -> handleDisconnectRequest(context)
                 "toggleAppNotif" -> handleToggleAppNotification(context, data)
-                "toggleNowPlaying" -> handleToggleNowPlaying(context, data)
                 "macVolume" -> handleMacVolume(data)
-                "macMediaControlResponse" -> if (!data.optBoolean("success")) {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        Toast.makeText(context, data.optString("error", "Mac 无法执行此操作，请检查输出设备及权限"), Toast.LENGTH_LONG).show()
-                    }
-                }
                 "modifierStatus" -> handleModifierStatus(data)
                 "ping" -> handlePing(context)
                 "status" -> handleMacDeviceStatus(context, data)
@@ -219,108 +205,6 @@ object WebSocketMessageHandler {
         }
     }
 
-    /**
-     * Handles media control commands (play/pause, seek, next, previous, like).
-     * Sends a response back to Mac and updates local media state after a short delay.
-     */
-    private fun handleMediaControl(context: Context, data: JSONObject?) {
-        try {
-            if (data == null) {
-                Log.e(TAG, "Media control data is null")
-                sendMediaControlResponse("unknown", false, "No data provided")
-                return
-            }
-
-            val action = data.optString("action")
-            var success = false
-            var message: String
-
-            when (action) {
-                "playPause" -> {
-                    success = MediaControlUtil.playPause(context)
-                    message = if (success) "Play/pause toggled" else "Failed to toggle play/pause"
-                }
-
-                "play" -> {
-                    success = MediaControlUtil.playPause(context)
-                    message = if (success) "Playback started" else "Failed to start playback"
-                }
-
-                "pause" -> {
-                    success = MediaControlUtil.playPause(context)
-                    message = if (success) "Playback paused" else "Failed to pause playback"
-                }
-
-                "seekTo" -> {
-                    val positionMs = data.optLong("positionMs", -1L)
-                    success = positionMs >= 0L && MediaControlUtil.seekTo(context, positionMs)
-                    message =
-                        if (success) "Seeked to ${positionMs}ms" else "Failed to seek playback"
-                }
-
-                "next" -> {
-                    // Suppress automatic media updates before executing skip command
-                    SyncManager.suppressMediaUpdatesForSkip()
-                    success = MediaControlUtil.skipNext(context)
-                    message =
-                        if (success) "Skipped to next track" else "Failed to skip to next track"
-                }
-
-                "previous" -> {
-                    // Suppress automatic media updates before executing skip command
-                    SyncManager.suppressMediaUpdatesForSkip()
-                    success = MediaControlUtil.skipPrevious(context)
-                    message =
-                        if (success) "Skipped to previous track" else "Failed to skip to previous track"
-                }
-
-                "stop" -> {
-                    success = MediaControlUtil.stop(context)
-                    message = if (success) "Playback stopped" else "Failed to stop playback"
-                }
-                // New: toggle like controls
-                "toggleLike" -> {
-                    success = MediaControlUtil.toggleLike(context)
-                    message = if (success) "Like toggled" else "Failed to toggle like"
-                }
-
-                "like" -> {
-                    success = MediaControlUtil.like(context)
-                    message = if (success) "Liked" else "Failed to like"
-                }
-
-                "unlike" -> {
-                    success = MediaControlUtil.unlike(context)
-                    message = if (success) "Unliked" else "Failed to unlike"
-                }
-
-                else -> {
-                    Log.w(TAG, "Unknown media control action: $action")
-                    message = "Unknown action: $action"
-                }
-            }
-
-            sendMediaControlResponse(action, success, message)
-
-            // Send updated media state after successful control
-            if (success) {
-                // For track skip actions (next/previous), add a delay to allow media player to update
-                CoroutineScope(Dispatchers.IO).launch {
-                    val delayMs = when (action) {
-                        "seekTo" -> 650L
-                        "next", "previous" -> 1200L
-                        else -> 400L // smaller delay for like/others
-                    }
-                    delay(delayMs)
-                    SyncManager.onMediaStateChanged(context)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling media control: ${e.message}")
-            sendMediaControlResponse("unknown", false, "Error: ${e.message}")
-        }
-    }
-
 
     /**
      * Attempts to dismiss a notification on the Android device by ID.
@@ -431,7 +315,7 @@ object WebSocketMessageHandler {
     }
 
     /**
-     * Processes status updates received from the Mac (battery, music, etc.).
+     * Processes battery and identity updates received from the Mac.
      * Updates local storage and triggers widget refresh if needed.
      */
     private fun handleMacDeviceStatus(context: Context, data: JSONObject?) {
@@ -441,68 +325,25 @@ object WebSocketMessageHandler {
                 return
             }
 
-            Log.d(TAG, "Received Mac device status: $data")
 
             // Parse battery information
             val battery = data.optJSONObject("battery")
             val batteryLevel = battery?.optInt("level", 0) ?: 0
             val isCharging = battery?.optBoolean("isCharging", false) ?: false
 
-            // Parse music information
-            val music = data.optJSONObject("music")
-            val isPlaying = music?.optBoolean("isPlaying", false) ?: false
-            val title = music?.optString("title", "") ?: ""
-            val artist = music?.optString("artist", "") ?: ""
-            val volume = music?.optInt("volume", 50) ?: 50
-            val isMuted = music?.optBoolean("isMuted", false) ?: false
-
-            val albumArt =
-                if (music?.has("albumArt") == true) music.optString("albumArt", "") else null
-
-            val likeStatus = music?.optString("likeStatus", "none") ?: "none"
-            val elapsedTime = ((music?.optDouble("elapsedTime", 0.0) ?: 0.0) * 1000).toLong()
-            val duration = ((music?.optDouble("duration", 0.0) ?: 0.0) * 1000).toLong()
-            val timestamp = music?.optString("timestamp")
-            val playbackRate = music?.optDouble("playbackRate", 1.0) ?: 1.0
-
-            val isPaired = data.optBoolean("isPaired", true)
-
-            // Pause/resume media listener based on Mac media playback status
-            val hasActiveMedia = isPlaying && (title.isNotEmpty() || artist.isNotEmpty())
-            if (hasActiveMedia) {
-                MediaNotificationListener.pauseMediaListener()
-            } else {
-                MediaNotificationListener.resumeMediaListener()
-            }
-
-            // Update the Mac device status manager with all media info
             MacDeviceStatusManager.updateStatus(
                 context = context,
-                name = data.optString(
-                    "name",
-                    MacDeviceStatusManager.macDeviceStatus.value?.name ?: "Unknown"
-                ),
+                name = data.optString("name", MacDeviceStatusManager.macDeviceStatus.value?.name ?: "Unknown"),
                 batteryLevel = batteryLevel,
                 isCharging = isCharging,
-                isPaired = isPaired,
-                isPlaying = isPlaying,
-                title = title,
-                artist = artist,
-                volume = volume,
-                isMuted = isMuted,
-                albumArt = albumArt,
-                likeStatus = likeStatus,
-                elapsedTime = elapsedTime,
-                duration = duration,
-                timestamp = timestamp,
-                playbackRate = playbackRate
+                isPaired = data.optBoolean("isPaired", true)
             )
 
             // Persist a lightweight snapshot for widget consumption and throttle widget refresh
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val ds = DataStoreManager(context)
-                    ds.saveMacStatusForWidget(batteryLevel, isCharging, title, artist)
+                    ds.saveMacStatusForWidget(batteryLevel, isCharging)
 
                     // Throttle widget updates to once per minute to reduce battery usage
                     val lastRefresh = ds.getMacWidgetRefreshedAt().first() ?: 0L
@@ -693,10 +534,6 @@ val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.m
         }
     }
 
-    // Helper method to check if we should send media controls to prevent feedback loop
-    fun shouldSendMediaControl(): Boolean {
-        return !isReceivingPlayingMedia
-    }
 
     private fun sendVolumeControlResponse(action: String, success: Boolean, message: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -705,12 +542,6 @@ val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.m
         }
     }
 
-    private fun sendMediaControlResponse(action: String, success: Boolean, message: String) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val response = JsonUtil.createMediaControlResponse(action, success, message)
-            WebSocketUtil.sendMessage(response)
-        }
-    }
 
     private fun sendNotificationDismissalResponse(id: String, success: Boolean, message: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -810,39 +641,6 @@ val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.m
         }
     }
 
-    private fun handleToggleNowPlaying(context: Context, data: JSONObject?) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                if (data == null) {
-                    Log.e(TAG, "toggleNowPlaying data is null")
-                    val resp =
-                        JsonUtil.createToggleNowPlayingResponse(false, null, "No data provided")
-                    WebSocketUtil.sendMessage(resp)
-                    return@launch
-                }
-                // Accept either boolean or string "true"/"false"
-                val hasBoolean = data.has("state") && (data.opt("state") is Boolean)
-                val newState = if (hasBoolean) data.optBoolean("state") else data.optString("state")
-                    .toBoolean()
-
-                val ds = DataStoreManager(context)
-                ds.setSendNowPlayingEnabled(newState)
-                MediaNotificationListener.setNowPlayingEnabled(context, newState)
-
-                val resp = JsonUtil.createToggleNowPlayingResponse(
-                    true,
-                    newState,
-                    "Now playing set to $newState"
-                )
-                WebSocketUtil.sendMessage(resp)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error handling toggleNowPlaying: ${e.message}")
-                val resp =
-                    JsonUtil.createToggleNowPlayingResponse(false, null, "Error: ${e.message}")
-                WebSocketUtil.sendMessage(resp)
-            }
-        }
-    }
 
     private fun handleMacVolume(data: JSONObject?) {
         try {
@@ -850,7 +648,7 @@ val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.m
             val volume = data.optInt("volume", -1)
             if (volume >= 0) {
                 Log.d(TAG, "Received Mac volume update: $volume")
-                onMacVolumeReceived?.invoke(volume)
+                _macSystemVolume.value = volume.coerceIn(0, 100)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error handling macVolume: ${e.message}")

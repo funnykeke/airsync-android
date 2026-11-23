@@ -134,10 +134,6 @@
             android:label="@string/title_permissions"
             android:theme="@style/Theme.AirSync" />
 
-        <service
-            android:name=".service.MacMediaPlayerService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
 
         <!-- Quick Settings Tile Service -->
         <service

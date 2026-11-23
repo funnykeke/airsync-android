@@ -61,7 +61,6 @@ import com.sameerasw.airsync.presentation.ui.components.cards.DeveloperModeCard
 import com.sameerasw.airsync.presentation.ui.components.cards.DeviceInfoCard
 import com.sameerasw.airsync.presentation.ui.components.cards.IconToggleItem
 import com.sameerasw.airsync.presentation.ui.components.cards.ManualConnectionCard
-import com.sameerasw.airsync.presentation.ui.components.cards.MediaSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.NotificationSyncCard
 import com.sameerasw.airsync.presentation.ui.components.cards.PermissionsCard
 import com.sameerasw.airsync.presentation.ui.components.cards.QuickSettingsTilesCard
@@ -112,7 +111,6 @@ fun SettingsView(
 ) {
     val haptics = LocalHapticFeedback.current
     var showAppSelectionSheet by remember { mutableStateOf(false) }
-    var showMediaAppSelectionSheet by remember { mutableStateOf(false) }
     var showManualConnection by remember { mutableStateOf(false) }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -296,13 +294,13 @@ fun SettingsView(
                 )
 
                 IconToggleItem(
-                    title = stringResource(R.string.ui_media_and_files),
-                    description = stringResource(R.string.ui_media_controls_quick_share_and_more),
+                    title = stringResource(R.string.ui_files),
+                    description = stringResource(R.string.ui_file_sharing_and_access),
                     iconRes = R.drawable.rounded_folder_managed_24,
                     showToggle = false,
                     onClick = {
                         HapticUtil.performClick(haptics)
-                        onCategoryChange("Media and Files")
+                        onCategoryChange("Files")
                     }
                 )
 
@@ -441,7 +439,7 @@ fun SettingsView(
                                 .fillMaxWidth()
                                 .height(headerHeight)
                         )
-                        "Media and Files" -> FileAnimation(
+                        "Files" -> FileAnimation(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(headerHeight)
@@ -457,7 +455,7 @@ fun SettingsView(
                     "App" -> stringResource(R.string.ui_app)
                     "Notifications" -> stringResource(R.string.ui_notifications)
                     "Clipboard" -> stringResource(R.string.ui_clipboard)
-                    "Media and Files" -> stringResource(R.string.ui_media_and_files)
+                    "Files" -> stringResource(R.string.ui_files)
                     "Widget" -> stringResource(R.string.ui_widget)
                     else -> activeCategory
                 }
@@ -594,23 +592,7 @@ fun SettingsView(
                                 viewModel.refreshPermissions(context)
                             }
                         }
-                        "Media and Files" -> {
-                            MediaSyncCard(
-                                isSendNowPlayingEnabled = uiState.isSendNowPlayingEnabled,
-                                onToggleSendNowPlaying = { enabled ->
-                                    viewModel.setSendNowPlayingEnabled(enabled)
-                                },
-                                isMacMediaControlsEnabled = uiState.isMacMediaControlsEnabled,
-                                onToggleMacMediaControls = { enabled ->
-                                    viewModel.setMacMediaControlsEnabled(enabled)
-                                },
-                                onOpenExcludedApps = {
-                                    HapticUtil.performClick(haptics)
-                                    viewModel.loadMediaApps(context)
-                                    showMediaAppSelectionSheet = true
-                                }
-                            )
-
+                        "Files" -> {
                             IconToggleItem(
                                 title = stringResource(R.string.ui_quick_share),
                                 description = stringResource(R.string.ui_allow_receiving_files_from_nearby_devices),
@@ -643,7 +625,7 @@ fun SettingsView(
             }
         }
 
-        Spacer(modifier = Modifier.height(220.dp))
+        Spacer(modifier = Modifier.height(100.dp))
     }
 
     if (showAppSelectionSheet) {
@@ -661,20 +643,7 @@ fun SettingsView(
         )
     }
 
-    if (showMediaAppSelectionSheet) {
-        val mediaApps by viewModel.mediaApps.collectAsState()
-        AppSelectionSheet(
-            onDismissRequest = { showMediaAppSelectionSheet = false },
-            apps = mediaApps,
-            onAppToggle = { pkg, isExcluded ->
-                viewModel.toggleExcludedMediaPackage(pkg, isExcluded)
-            },
-            onSaveAll = { updatedList ->
-                viewModel.saveAllMediaApps(updatedList)
-            },
-            isLoading = mediaApps.isEmpty()
-        )
-    }
+
 }
 
 @Composable

@@ -241,7 +241,6 @@ viewModelScope.launch {
         }
 
 
-
         // Observe widget transparency preference
         viewModelScope.launch {
             repository.getWidgetTransparency().collect { trans ->
@@ -264,20 +263,6 @@ viewModelScope.launch {
             }
         }
 
-        // Observe Send now playing preference
-        viewModelScope.launch {
-            repository.getSendNowPlayingEnabled().collect { enabled ->
-                _uiState.value = _uiState.value.copy(isSendNowPlayingEnabled = enabled)
-            }
-        }
-
-        // Observe Excluded media packages preference
-        viewModelScope.launch {
-            repository.getExcludedMediaPackages().collect { packages ->
-                _uiState.value = _uiState.value.copy(excludedMediaPackages = packages)
-                com.sameerasw.airsync.service.MediaNotificationListener.setExcludedMediaPackages(packages)
-            }
-        }
 
         // Observe Notify on Crash preference
         viewModelScope.launch {
@@ -379,9 +364,7 @@ viewModelScope.launch {
             val isAutoReconnectEnabled = repository.getAutoReconnectEnabled().first()
             val lastConnectedSymmetricKey = lastConnected?.symmetricKey
             val isContinueBrowsingEnabled = repository.getContinueBrowsingEnabled().first()
-            val isSendNowPlayingEnabled = repository.getSendNowPlayingEnabled().first()
             val isKeepPreviousLinkEnabled = repository.getKeepPreviousLinkEnabled().first()
-            val isMacMediaControlsEnabled = repository.getMacMediaControlsEnabled().first()
             val isClipboardHistoryEnabled = repository.getClipboardHistoryEnabled().first()
             repository.getDefaultTab().first()
             val isDeviceDiscoveryEnabled = repository.getDeviceDiscoveryEnabled().first()
@@ -450,9 +433,7 @@ viewModelScope.launch {
                 isConnected = currentlyConnected,
                 symmetricKey = symmetricKey ?: if (transportMode == "relay") transportStore.getRelaySymmetricKey().first() else lastConnectedSymmetricKey,
                 isContinueBrowsingEnabled = isContinueBrowsingEnabled,
-                isSendNowPlayingEnabled = isSendNowPlayingEnabled,
                 isKeepPreviousLinkEnabled = isKeepPreviousLinkEnabled,
-                isMacMediaControlsEnabled = isMacMediaControlsEnabled,
                 isClipboardHistoryEnabled = isClipboardHistoryEnabled,
                 isDeviceDiscoveryEnabled = isDeviceDiscoveryEnabled,
                 isBlurSettingEnabled = isBlurEnabledSetting,
@@ -724,7 +705,6 @@ viewModelScope.launch {
             )
         }
     }
-
 
 
     fun setPitchBlackThemeEnabled(enabled: Boolean) {
@@ -1106,19 +1086,6 @@ viewModelScope.launch {
         }
     }
 
-    fun setSendNowPlayingEnabled(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(isSendNowPlayingEnabled = enabled)
-        viewModelScope.launch {
-            repository.setSendNowPlayingEnabled(enabled)
-            appContext?.let { ctx ->
-                // Update media listener immediate behavior and sync status
-                com.sameerasw.airsync.service.MediaNotificationListener.setNowPlayingEnabled(
-                    ctx,
-                    enabled
-                )
-            }
-        }
-    }
 
     fun setKeepPreviousLinkEnabled(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(isKeepPreviousLinkEnabled = enabled)
@@ -1127,19 +1094,6 @@ viewModelScope.launch {
         }
     }
 
-
-    fun setMacMediaControlsEnabled(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(isMacMediaControlsEnabled = enabled)
-        viewModelScope.launch {
-            repository.setMacMediaControlsEnabled(enabled)
-            // If disabled, stop the service immediately
-            if (!enabled) {
-                appContext?.let { ctx ->
-                    com.sameerasw.airsync.service.MacMediaPlayerService.stopMacMedia(ctx)
-                }
-            }
-        }
-    }
 
     // Expose DataStore export/import helpers
     suspend fun exportAllDataToJson(context: Context): String? {
@@ -1229,58 +1183,6 @@ viewModelScope.launch {
         }
     }
 
-
-
-    private val _mediaApps =
-        MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())
-    val mediaApps: StateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>> =
-        _mediaApps.asStateFlow()
-
-    fun loadMediaApps(context: Context) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val installed = com.sameerasw.airsync.utils.AppUtil.getInstalledApps(context)
-                val excluded = _uiState.value.excludedMediaPackages
-                val mapped = installed.map { app ->
-                    app.copy(isEnabled = excluded.contains(app.packageName))
-                }
-                _mediaApps.value = mapped
-            } catch (e: Exception) {
-                Log.e("AirSyncViewModel", "Failed to load media apps: ${e.message}")
-            }
-        }
-    }
-
-    fun toggleExcludedMediaPackage(packageName: String, isExcluded: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val currentExcluded = _uiState.value.excludedMediaPackages.toMutableSet()
-                if (isExcluded) {
-                    currentExcluded.add(packageName)
-                } else {
-                    currentExcluded.remove(packageName)
-                }
-                repository.setExcludedMediaPackages(currentExcluded)
-                _mediaApps.value = _mediaApps.value.map { app ->
-                    if (app.packageName == packageName) app.copy(isEnabled = isExcluded) else app
-                }
-            } catch (e: Exception) {
-                Log.e("AirSyncViewModel", "Failed to toggle excluded media package: ${e.message}")
-            }
-        }
-    }
-
-    fun saveAllMediaApps(apps: List<com.sameerasw.airsync.domain.model.NotificationApp>) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val excluded = apps.filter { it.isEnabled }.map { it.packageName }.toSet()
-                repository.setExcludedMediaPackages(excluded)
-                _mediaApps.value = apps
-            } catch (e: Exception) {
-                Log.e("AirSyncViewModel", "Failed to save all media apps: ${e.message}")
-            }
-        }
-    }
 
     private val _notificationApps =
         MutableStateFlow<List<com.sameerasw.airsync.domain.model.NotificationApp>>(emptyList())

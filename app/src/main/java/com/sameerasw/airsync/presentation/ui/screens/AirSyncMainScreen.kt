@@ -105,7 +105,6 @@ import com.sameerasw.airsync.R
 import com.sameerasw.airsync.data.local.DataStoreManager
 import com.sameerasw.airsync.presentation.ui.activities.QRScannerActivity
 import com.sameerasw.airsync.presentation.ui.components.AirSyncFloatingToolbar
-import com.sameerasw.airsync.presentation.ui.components.FloatingMediaPlayer
 import com.sameerasw.airsync.presentation.ui.components.RoundedCardContainer
 import com.sameerasw.airsync.presentation.ui.components.SettingsView
 import com.sameerasw.airsync.presentation.ui.components.buttons.ListExpandToggleButton
@@ -123,7 +122,6 @@ import com.sameerasw.airsync.presentation.viewmodel.AirSyncViewModel
 import com.sameerasw.airsync.utils.ClipboardSyncManager
 import com.sameerasw.airsync.utils.HapticUtil
 import com.sameerasw.airsync.utils.JsonUtil
-import com.sameerasw.airsync.utils.MacDeviceStatusManager
 import com.sameerasw.airsync.utils.WebSocketMessageHandler
 import com.sameerasw.airsync.utils.WebSocketUtil
 import kotlinx.coroutines.Dispatchers
@@ -178,43 +176,14 @@ fun AirSyncMainScreen(
     var hasAppliedInitialTab by remember { mutableStateOf(false) }
 
 
-
     var activeSettingsCategory by rememberSaveable { mutableStateOf<String?>(null) }
-
-    // Volume & Media state
-    var volume by remember { mutableFloatStateOf(50f) }
-    var isMuted by remember { mutableStateOf(false) }
-
-    // Observe Mac Status
-    val macStatus by MacDeviceStatusManager.macDeviceStatus.collectAsState()
-    val albumArtBitmap by MacDeviceStatusManager.albumArt.collectAsState()
-
-    // Sync volume and mute state with Mac status updates
-    LaunchedEffect(macStatus?.music) {
-        macStatus?.music?.let { music ->
-            volume = music.volume.toFloat()
-            isMuted = music.isMuted
-        }
-    }
-
-    // Volume updates from Mac
-    DisposableEffect(Unit) {
-        val callback = { newVolume: Int ->
-            volume = newVolume.toFloat()
-        }
-        WebSocketMessageHandler.setOnMacVolumeCallback(callback)
-        onDispose {
-            WebSocketMessageHandler.setOnMacVolumeCallback(null)
-        }
-    }
 
     fun sendRemoteAction(action: String, value: Any? = null) {
         scope.launch {
             try {
                 HapticUtil.performLightTick(haptics)
                 val json = JSONObject()
-                val mediaActions = setOf("vol_set", "vol_mute", "vol_up", "vol_down", "media_play_pause", "media_next", "media_prev")
-                json.put("type", if (action in mediaActions) "macMediaControl" else "remoteControl")
+                json.put("type", "remoteControl")
                 val data = JSONObject()
                 data.put("action", action)
                 if (value != null) data.put("value", value)
@@ -278,10 +247,7 @@ fun AirSyncMainScreen(
                     "connect" -> 0
                     "remote" -> 1
                     "clipboard" -> 2
-                    "dynamic" -> {
-                        // Check if music is playing on Mac
-                        if (uiState.macDeviceStatus?.music?.isPlaying == true) 0 else 2
-                    }
+
 
                     else -> 0
                 }
@@ -743,7 +709,7 @@ fun AirSyncMainScreen(
 
             // Blur heights
             val bottomBlurHeightPx = with(density) {
-                if (isLandscape) 100.dp.toPx() else 180.dp.toPx()
+                100.dp.toPx()
             }
 
             Box(
@@ -806,6 +772,10 @@ fun AirSyncMainScreen(
                                             viewModel.setAppPaused(context, !uiState.isAppPaused)
                                         }
                                     )
+
+                                    if (uiState.isConnected) {
+                                        com.sameerasw.airsync.presentation.ui.components.SystemVolumeControls()
+                                    }
 
                                     // Remote Functions Card (Lock Screen, etc.)
                                     AnimatedVisibility(
@@ -1121,7 +1091,7 @@ fun AirSyncMainScreen(
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(200.dp))
+                                Spacer(modifier = Modifier.height(100.dp))
                             }
                         }
 
@@ -1133,7 +1103,7 @@ fun AirSyncMainScreen(
                                         .fillMaxSize()
                                         .padding(
                                             top = statusBarHeight,
-                                            bottom = if (isLandscape) 100.dp else 180.dp
+                                            bottom = 100.dp
                                         ),
                                     showKeyboard = showKeyboard,
                                     onDismissKeyboard = { showKeyboard = false }
@@ -1187,7 +1157,7 @@ fun AirSyncMainScreen(
                                         .fillMaxSize()
                                         .padding(
                                             top = topSpacing,
-                                            bottom = if (isLandscape) 100.dp else 180.dp
+                                            bottom = 100.dp
                                         ),
                                 )
                             } else {
@@ -1250,29 +1220,7 @@ fun AirSyncMainScreen(
                             ),
                             verticalAlignment = Alignment.Bottom
                         ) {
-                            AnimatedVisibility(
-                                visible = uiState.isConnected,
-                                enter = fadeIn() + expandHorizontally(),
-                                exit = fadeOut() + shrinkHorizontally(),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                FloatingMediaPlayer(
-                                    musicInfo = macStatus?.music,
-                                    albumArtBitmap = albumArtBitmap,
-                                    volume = volume,
-                                    isMuted = isMuted,
-                                    onVolumeChange = {
-                                        volume = it
-                                        sendRemoteAction("vol_set", it.toInt())
-                                    },
-                                    onToggleMute = {
-                                        sendRemoteAction("vol_mute")
-                                        isMuted = !isMuted
-                                    },
-                                    onMediaAction = { sendRemoteAction(it) },
-                                    isRippleEnabled = uiState.isRippleSettingEnabled
-                                )
-                            }
+
 
                             AirSyncFloatingToolbar(
                                 modifier = Modifier.zIndex(1f),
@@ -1316,28 +1264,7 @@ fun AirSyncMainScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            AnimatedVisibility(
-                                visible = uiState.isConnected,
-                                enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-                                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
-                            ) {
-                                FloatingMediaPlayer(
-                                    musicInfo = macStatus?.music,
-                                    albumArtBitmap = albumArtBitmap,
-                                    volume = volume,
-                                    isMuted = isMuted,
-                                    onVolumeChange = {
-                                        volume = it
-                                        sendRemoteAction("vol_set", it.toInt())
-                                    },
-                                    onToggleMute = {
-                                        sendRemoteAction("vol_mute")
-                                        isMuted = !isMuted
-                                    },
-                                    onMediaAction = { sendRemoteAction(it) },
-                                    isRippleEnabled = uiState.isRippleSettingEnabled
-                                )
-                            }
+
 
                             AirSyncFloatingToolbar(
                                 modifier = Modifier.zIndex(1f),
