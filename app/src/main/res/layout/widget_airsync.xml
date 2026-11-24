@@ -59,8 +59,7 @@
                 android:layout_height="16dp"
                 android:adjustViewBounds="true"
                 android:scaleType="centerInside"
-                android:src="@drawable/outline_battery_full_24"
-                android:tint="@color/widget_primary_text" />
+                android:src="@drawable/outline_battery_full_24" />
 
             <TextView
                 android:id="@+id/widget_battery_text"

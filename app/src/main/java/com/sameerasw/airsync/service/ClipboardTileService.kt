@@ -1,6 +1,8 @@
 package com.sameerasw.airsync.service
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
+import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
@@ -60,45 +62,22 @@ class ClipboardTileService : TileService() {
             val dataStoreManager = DataStoreManager.getInstance(this@ClipboardTileService)
             val isPaused = dataStoreManager.isAppPaused().first()
             if (isPaused) {
-                val mainIntent = android.content.Intent(this@ClipboardTileService, com.sameerasw.airsync.MainActivity::class.java).apply {
-                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                val mainIntent = Intent(this@ClipboardTileService, com.sameerasw.airsync.MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    val pendingIntent = PendingIntent.getActivity(
-                        this@ClipboardTileService,
-                        0,
-                        mainIntent,
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                    )
-                    startActivityAndCollapse(pendingIntent)
-                } else {
-                    @Suppress("DEPRECATION")
-                    startActivityAndCollapse(mainIntent)
-                }
+                launchActivityAndCollapse(mainIntent)
                 return@launch
             }
 
             val isConnected = WebSocketUtil.isConnected()
             if (isConnected) {
                 try {
-                    val intent = android.content.Intent(
+                    val intent = Intent(
                         this@ClipboardTileService,
                         com.sameerasw.airsync.presentation.ui.activities.ClipboardActionActivity::class.java
                     )
-                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        val pendingIntent = PendingIntent.getActivity(
-                            this@ClipboardTileService,
-                            0,
-                            intent,
-                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                        )
-                        startActivityAndCollapse(pendingIntent)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        startActivityAndCollapse(intent)
-                    }
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    launchActivityAndCollapse(intent)
                 } catch (e: Exception) {
                     Log.e(TAG, "Error launching clipboard activity", e)
                     Toast.makeText(
@@ -115,6 +94,23 @@ class ClipboardTileService : TileService() {
                 ).show()
                 updateTileState(false)
             }
+        }
+    }
+
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    private fun launchActivityAndCollapse(intent: Intent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            startActivityAndCollapse(pendingIntent)
+        } else {
+            // The PendingIntent overload was added in API 34.
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(intent)
         }
     }
 

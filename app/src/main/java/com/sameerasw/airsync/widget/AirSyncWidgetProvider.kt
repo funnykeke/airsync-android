@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.RemoteViews
+import androidx.core.content.ContextCompat
 import com.sameerasw.airsync.MainActivity
 import com.sameerasw.airsync.R
 import com.sameerasw.airsync.data.local.DataStoreManager
@@ -123,6 +124,8 @@ class AirSyncWidgetProvider : AppWidgetProvider() {
             val accentColor =
                 androidx.core.content.ContextCompat.getColor(context, R.color.material_primary)
             views.setInt(R.id.widget_device_image, "setColorFilter", accentColor)
+            val batteryIconColor = ContextCompat.getColor(context, R.color.widget_primary_text)
+            views.setInt(R.id.widget_battery_icon, "setColorFilter", batteryIconColor)
 
             // Dim the device image when not connected (including while connecting)
             val alphaFloat = if (isConnected) 1.0f else 0.6f

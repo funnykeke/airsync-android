@@ -80,7 +80,7 @@ class QuickShareDiscovery(private val context: Context) {
         normalizedTarget: String,
         onFound: (ResolvedHost) -> Unit
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             nsdManager.registerServiceInfoCallback(
                 service,
                 context.mainExecutor,

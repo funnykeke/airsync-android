@@ -1,13 +1,13 @@
 package com.sameerasw.airsync.utils
 
-import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.annotation.RequiresPermission
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
@@ -52,7 +52,6 @@ object NotificationUtil {
         notificationManager.createNotificationChannel(channel)
     }
 
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun showFileProgress(
         context: Context,
         notifId: Int,
@@ -62,8 +61,9 @@ object NotificationUtil {
         isSending: Boolean = false,
         etaString: String? = null
     ) {
+        if (!PermissionUtil.isPostNotificationPermissionGranted(context)) return
+
         createFileChannel(context)
-        val manager = NotificationManagerCompat.from(context)
 
         // Cancel intent
         val cancelIntent = Intent(context, NotificationActionReceiver::class.java).apply {
@@ -117,10 +117,9 @@ object NotificationUtil {
         extras.putString("android.shortCriticalText", chipText)
         builder.addExtras(extras)
 
-        manager.notify(notifId, builder.build())
+        postFileNotification(NotificationManagerCompat.from(context), notifId, builder.build())
     }
 
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     fun showFileComplete(
         context: Context,
         notifId: Int,
@@ -129,6 +128,8 @@ object NotificationUtil {
         isSending: Boolean = false,
         contentUri: Uri? = null
     ) {
+        if (!PermissionUtil.isPostNotificationPermissionGranted(context)) return
+
         createFileChannel(context)
         val manager = NotificationManagerCompat.from(context)
         manager.cancel(notifId)
@@ -172,8 +173,20 @@ object NotificationUtil {
             builder.addAction(android.R.drawable.ic_menu_view, context.getString(R.string.action_open), pending)
         }
 
-        val notif = builder.build()
-        manager.notify(notifId, notif)
+        postFileNotification(manager, notifId, builder.build())
+    }
+
+    private fun postFileNotification(
+        manager: NotificationManagerCompat,
+        notifId: Int,
+        notification: Notification
+    ) {
+        try {
+            manager.notify(notifId, notification)
+        } catch (e: SecurityException) {
+            // Permission can change after the check. The transfer can still continue.
+            Log.w("NotificationUtil", "Could not post file transfer notification", e)
+        }
     }
 
     // New: Continue Browsing notifications

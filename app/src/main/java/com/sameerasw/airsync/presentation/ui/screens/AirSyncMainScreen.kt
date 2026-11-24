@@ -715,6 +715,7 @@ fun AirSyncMainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(innerPadding)
                     .onSizeChanged { rootSize = it }
             ) {
                 HorizontalPager(
