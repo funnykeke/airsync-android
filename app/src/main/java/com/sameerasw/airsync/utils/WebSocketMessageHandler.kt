@@ -1,7 +1,6 @@
 package com.sameerasw.airsync.utils
 
 import com.sameerasw.airsync.R
-import FileBrowserUtil
 import kotlinx.coroutines.flow.asStateFlow
 import android.content.Context
 import android.content.Intent
@@ -52,7 +51,7 @@ object WebSocketMessageHandler {
      * @param context Application context for performing actions.
      * @param message Raw JSON message string.
      */
-    fun handleIncomingMessage(context: Context, json: String) {
+    internal fun handleIncomingMessage(context: Context, json: String, fileSession: WebSocketUtil.FileSession?) {
         Log.d(TAG, "Received business message")
         try {
             val jsonObject = JSONObject(json)
@@ -78,9 +77,9 @@ object WebSocketMessageHandler {
                 "status" -> handleMacDeviceStatus(context, data)
                 "macInfo" -> handleMacInfo(context, data)
                 "refreshAdbPorts" -> handleRefreshAdbPorts(context)
-                "browseLs" -> handleBrowseLs(context, data)
+                "browseLs" -> fileSession?.let { LocalFileTransfer.browse(data, it) }
                 "startQuickShare" -> handleStartQuickShare(context)
-                "filePull", "fileTransferInit", "fileChunk", "fileChunkAck", "fileTransferComplete", "fileTransferCancel", "transferVerified" -> LocalFileTransfer.handle(context, type, data)
+                "filePull", "fileTransferInit", "fileChunk", "fileChunkAck", "fileTransferComplete", "fileTransferCancel", "transferVerified" -> fileSession?.let { LocalFileTransfer.handle(context, type, data, it) }
                 else -> {
                     Log.w(TAG, "Unknown message type: $type")
                 }
@@ -662,18 +661,6 @@ val last = ds.getLastConnectedDevice().first() ?: com.sameerasw.airsync.domain.m
             onModifierStatusReceived?.invoke(data)
         } catch (e: Exception) {
             Log.e(TAG, "Error handling modifierStatus: ${e.message}")
-        }
-    }
-
-    private fun handleBrowseLs(context: Context, data: JSONObject?) {
-        try {
-            val path = data?.optString("path")
-            val showHidden = data?.optBoolean("showHidden", false) ?: false
-            Log.d(TAG, "Browse request for path: $path, showHidden: $showHidden")
-            val response = FileBrowserUtil.listDirectory(path, showHidden)
-            WebSocketUtil.sendMessage(response)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error handling browseLs: ${e.message}")
         }
     }
 

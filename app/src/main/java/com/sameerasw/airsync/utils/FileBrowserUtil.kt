@@ -1,75 +1,31 @@
+package com.sameerasw.airsync.utils
+
 import android.os.Environment
-import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 
 object FileBrowserUtil {
-    private const val TAG = "FileBrowserUtil"
-    private val ROOT_PATH = Environment.getExternalStorageDirectory().absolutePath
-
+    /** Bounds are canonical; display paths retain the Mac browser's /sdcard root. */
     fun listDirectory(path: String?, showHidden: Boolean = false): String {
-        var targetPath = if (path.isNullOrBlank()) ROOT_PATH else path
-
-        if (!targetPath.startsWith("/")) {
-            targetPath = ROOT_PATH + (if (targetPath.startsWith("/")) "" else "/") + targetPath
-        }
-
-        val directory = File(targetPath)
-
-        if (!directory.exists()) {
-            Log.e(TAG, "Directory does not exist: $targetPath")
-            return createErrorResponse(targetPath, "Directory does not exist")
-        }
-
-        if (!directory.isDirectory) {
-            Log.e(TAG, "Not a directory: $targetPath")
-            return createErrorResponse(targetPath, "Not a directory")
-        }
-
-        val items = directory.listFiles()
-        if (items == null) {
-            Log.e(TAG, "Access denied or I/O error for: $targetPath")
-            return createErrorResponse(
-                targetPath,
-                "Access denied. Please ensure 'All Files Access' permission is granted."
-            )
-        }
-
-        val jsonItems = JSONArray()
-        for (file in items.sortedBy { it.name.lowercase() }.sortedByDescending { it.isDirectory }) {
-            if (!showHidden && file.name.startsWith(".") && file.name != ".") {
-                continue
+        val root = Environment.getExternalStorageDirectory()
+        var display = "/sdcard"
+        val data = JSONObject()
+        try {
+            val directory = SharedStoragePath.resolve(root, path)
+            display = SharedStoragePath.display(root, directory)
+            require(directory.isDirectory) { "Directory unavailable" }
+            val items = directory.listFiles() ?: error("Access denied")
+            val result = JSONArray()
+            for (file in items.sortedBy { it.name.lowercase() }.sortedByDescending { it.isDirectory }) {
+                if (!showHidden && file.name.startsWith('.')) continue
+                // Do not expose metadata of symlinks pointing outside shared storage.
+                if (runCatching { SharedStoragePath.resolve(root, file.path) }.isFailure) continue
+                result.put(JSONObject().put("name", file.name).put("isDir", file.isDirectory)
+                    .put("size", if (file.isDirectory) 0 else file.length()).put("time", file.lastModified()))
             }
-            val item = JSONObject()
-            item.put("name", file.name)
-            item.put("isDir", file.isDirectory)
-            item.put("size", if (file.isDirectory) 0 else file.length())
-            item.put("time", file.lastModified())
-            jsonItems.put(item)
-        }
-
-        val data = JSONObject()
-        data.put("path", targetPath)
-        data.put("items", jsonItems)
-
-        val response = JSONObject()
-        response.put("type", "browseData")
-        response.put("data", data)
-
-        return response.toString()
-    }
-
-    private fun createErrorResponse(path: String, message: String): String {
-        val data = JSONObject()
-        data.put("path", path)
-        data.put("error", message)
-        data.put("items", JSONArray())
-
-        val response = JSONObject()
-        response.put("type", "browseData")
-        response.put("data", data)
-
-        return response.toString()
+            data.put("items", result)
+        } catch (_: Exception) { data.put("error", "Directory unavailable or access denied").put("items", JSONArray()) }
+        data.put("path", display)
+        return JSONObject().put("type", "browseData").put("data", data).toString()
     }
 }

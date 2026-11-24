@@ -32,6 +32,8 @@ object WebSocketUtil {
     @Volatile private var relay: RelayConnection? = null
     @Volatile private var key: SecretKey? = null
     @Volatile private var clipboardSession: Any? = null
+    @Volatile private var fileSession: FileSession? = null
+    internal class FileSession(val valid: () -> Boolean, val enqueue: (String) -> Boolean)
     private val manualGate = ManualConnectionGate()
     private var pendingSockets = mutableListOf<WebSocket>()
     private val client = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS).pingInterval(20, TimeUnit.SECONDS).build()
@@ -168,18 +170,21 @@ object WebSocketUtil {
                         phase(ConnectionPhase.ERROR, context.getString(com.sameerasw.airsync.R.string.relay_err_check_config))
                         return@launch
                     }
-                    relay = RelayConnection(context.applicationContext, url, room, secret, pinnedCertSha256,
+                    lateinit var capturedRelay: RelayConnection
+                    capturedRelay = RelayConnection(context.applicationContext, url, room, secret, pinnedCertSha256,
                         onState = { state, error -> scope.launch {
                             if (!lifecycle.accepts(session)) return@launch
                             when (state) {
-                                RelayConnection.State.WAITING -> { timeoutJob?.cancel(); SyncManager.stopPeriodicSync(); lifecycle.peer(false); publish() }
+                                RelayConnection.State.WAITING -> { invalidateFileSession(); clipboardSession = null; timeoutJob?.cancel(); SyncManager.stopPeriodicSync(); lifecycle.peer(false); publish() }
                                 RelayConnection.State.PEER_ONLINE -> startHandshake(context, session)
                                 RelayConnection.State.DISCONNECTED -> lost(context, session, error, "relay_disconnected")
                                 RelayConnection.State.ERROR -> { diagnostic("relay_error", session); closeTransport(); phase(ConnectionPhase.ERROR, error ?: context.getString(com.sameerasw.airsync.R.string.relay_err_rejected)) }
                             }
                         } },
-                        onMessage = { text -> scope.launch { receive(context, session, text) } }
-                    ).also { it.connect() }
+                        onMessage = { text, peer -> scope.launch { receive(context, session, text, capturedRelay, peer) } }
+                    )
+                    relay = capturedRelay
+                    capturedRelay.connect()
                 } else {
                     val ips = ipAddress.split(',').map { it.trim() }.filter { it.isNotBlank() }.distinct()
                     if (ips.isEmpty()) { phase(ConnectionPhase.ERROR, "请填写 Mac 的局域网 IP 地址"); return@launch }
@@ -230,8 +235,9 @@ object WebSocketUtil {
             }
         }
     }
-    private suspend fun receive(context: Context, token: Long, encrypted: String) {
-        if (!lifecycle.accepts(token)) return
+    private suspend fun receive(context: Context, token: Long, encrypted: String, sourceRelay: RelayConnection? = null, peer: Long? = null) {
+        fun current() = lifecycle.accepts(token) && (sourceRelay == null || (relay === sourceRelay && peer != null && sourceRelay.ownsPeer(peer)))
+        if (!current()) return
         val plain = key?.let { CryptoUtil.decryptMessage(encrypted, it) }
         if (plain == null) {
             lost(context, token, "无法解密 Mac 消息，请检查双方加密密钥是否一致", "decryption_failed"); return
@@ -241,6 +247,7 @@ object WebSocketUtil {
         if (!isConnected()) {
             if (type != "macInfo" || lifecycle.snapshot.phase != ConnectionPhase.HANDSHAKING) return
             lifecycle.authenticated()
+            establishFileSession()
             clipboardSession = Any()
             ClipboardSyncManager.resetSession()
             timeoutJob?.cancel(); cancelAutoReconnect(); retryCount = 0
@@ -249,21 +256,23 @@ object WebSocketUtil {
             val ds = DataStoreManager.getInstance(context)
             val payload = JSONObject(plain).optJSONObject("data")
             val last = ds.getLastConnectedDevice().first()
-            if (!lifecycle.accepts(token)) return
+            if (!current()) return
             val name = payload?.optString("name")?.takeIf { it.isNotBlank() } ?: last?.name ?: "Mac"
             val device = last ?: com.sameerasw.airsync.domain.model.ConnectedDevice(
                 name = name, ipAddress = "", port = "6996", lastConnected = System.currentTimeMillis(), isPlus = true)
             ds.saveLastConnectedDevice(if (isRelayMode() || isUsbMode()) device.copy(name = name, lastConnected = System.currentTimeMillis())
                 else device.copy(name = name, ipAddress = currentIpAddress ?: "", port = currentPort.toString(),
                     symmetricKey = java.util.Base64.getEncoder().encodeToString(key!!.encoded), lastConnected = System.currentTimeMillis()))
-            if (!lifecycle.accepts(token)) return
+            if (!current()) return
             publish()
             SyncManager.startPeriodicSync(context)
             SyncManager.checkAndSyncDeviceStatus(context, true)
             AirSyncService.start(context, null)
             MediaNotificationListener.syncActiveNotifications()
         }
-        WebSocketMessageHandler.handleIncomingMessage(context, plain)
+        if (!current()) return
+        val capturedFile = fileSessionToken()
+        WebSocketMessageHandler.handleIncomingMessage(context, plain, capturedFile)
         messageCallback?.invoke(plain)
     }
     private fun lost(context: Context, token: Long, reason: String?, source: String) {
@@ -313,26 +322,41 @@ object WebSocketUtil {
         return sent
     }
     internal fun localSessionToken(): Long? = lifecycle.generation.takeIf { !isRelayMode() && isConnected() }
+    internal fun ownsLocalSession(token: Long) = lifecycle.accepts(token) && !isRelayMode() && isConnected()
+    internal fun sendLocalFileMessage(token: Long, message: String): Boolean =
+        ownsLocalSession(token) && fileSessionToken()?.let { sendFileMessage(it, message) } == true
     internal fun clipboardSessionToken(): Any? = clipboardSession.takeIf { isConnected() }
-    /** Called on Main, with the original authenticated session, never a replacement peer. */
     internal fun sendClipboardMessage(session: Any, message: String): Boolean {
         if (session !== clipboardSession || !isConnected()) return false
         return sendMessage(message)
     }
-    internal fun ownsLocalSession(token: Long) = lifecycle.accepts(token) && !isRelayMode() && isConnected()
-    internal fun sendLocalFileMessage(token: Long, message: String): Boolean {
-        // Hold the original socket, so replacing the connection can never redirect
-        // an in-flight file task to a different peer.
-        val target = socket ?: return false
-        val sessionKey = key ?: return false
-        if (!ownsLocalSession(token)) return false
-        val encrypted = CryptoUtil.encryptMessage(message, sessionKey) ?: return false
-        if (!ownsLocalSession(token) || socket !== target) return false
-        return target.send(encrypted)
+    internal fun fileSessionToken(): FileSession? = fileSession?.takeIf { ownsFileSession(it) }
+    internal fun ownsFileSession(session: FileSession) = session === fileSession && isConnected() && session.valid()
+    internal fun sendFileMessage(session: FileSession, message: String): Boolean = ownsFileSession(session) && session.enqueue(message)
+    private fun invalidateFileSession() {
+        fileSession = null
+        LocalFileTransfer.reset()
+    }
+    private fun establishFileSession() {
+        invalidateFileSession()
+        val generation = lifecycle.generation
+        val sessionKey = key ?: return
+        val targetRelay = relay.takeIf { isRelayMode() }
+        val targetSocket = socket.takeIf { !isRelayMode() }
+        val peer = targetRelay?.peerToken()
+        if (targetRelay != null && peer == null) return
+        val valid = { lifecycle.accepts(generation) && key === sessionKey &&
+            (if (targetRelay != null) relay === targetRelay && targetRelay.ownsPeer(peer!!) else socket === targetSocket && targetSocket != null) }
+        fileSession = FileSession(valid) { message ->
+            val encrypted = CryptoUtil.encryptMessage(message, sessionKey)
+            if (encrypted == null || !valid()) false
+            else if (targetRelay != null) targetRelay.sendToPeer(peer!!, encrypted)
+            else targetSocket?.send(encrypted) == true
+        }
     }
     private fun closeTransport() {
         clipboardSession = null
-        LocalFileTransfer.reset()
+        invalidateFileSession()
         timeoutJob?.cancel(); timeoutJob = null
         relay?.close(); relay = null
         val oldSocket = socket; socket = null; oldSocket?.cancel()

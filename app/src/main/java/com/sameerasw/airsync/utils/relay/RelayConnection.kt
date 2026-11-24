@@ -3,6 +3,7 @@ package com.sameerasw.airsync.utils.relay
 import android.content.Context
 import android.util.Log
 import com.sameerasw.airsync.R
+import com.sameerasw.airsync.utils.RelayPeerBoundary
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -31,7 +32,7 @@ class RelayConnection(
     private val secret: String,
     private val pinnedCertSha256: String = "",
     private val onState: (State, String?) -> Unit,
-    private val onMessage: ((String) -> Unit)?
+    private val onMessage: ((String, Long) -> Unit)?
 ) {
     enum class State { WAITING, PEER_ONLINE, DISCONNECTED, ERROR }
 
@@ -55,6 +56,10 @@ class RelayConnection(
 
     @Volatile
     private var peerOnline = false
+    private val peerBoundary = RelayPeerBoundary()
+    fun peerToken(): Long? = peerBoundary.capture()
+    fun ownsPeer(token: Long) = !closed && peerBoundary.owns(token)
+    fun sendToPeer(token: Long, text: String) = peerBoundary.send(token) { !closed && webSocket?.send(text) == true }
 
     fun connect() {
         if (closed) return
@@ -96,12 +101,19 @@ class RelayConnection(
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (closed) return
+                peerBoundary.peer(false)
                 Log.e(TAG, "Relay connection failed")
                 onState(State.DISCONNECTED, context.getString(R.string.relay_err_disconnected))
             }
 
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                peerBoundary.peer(false)
+                webSocket.close(code, reason)
+            }
+
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 if (closed) return
+                peerBoundary.peer(false)
                 Log.d(TAG, "Relay closed: $code")
                 onState(State.DISCONNECTED, context.getString(R.string.relay_err_disconnected))
             }
@@ -112,6 +124,7 @@ class RelayConnection(
 
     fun close() {
         closed = true
+        peerBoundary.peer(false)
         webSocket?.close(1000, "client closing")
         webSocket = null
         client?.dispatcher?.executorService?.shutdown()
@@ -126,10 +139,12 @@ class RelayConnection(
                 when (obj.optString("op")) {
                     "joined" -> {
                         peerOnline = obj.optJSONObject("peer")?.optBoolean("online") ?: false
+                        peerBoundary.peer(peerOnline)
                         onState(if (peerOnline) State.PEER_ONLINE else State.WAITING, null)
                     }
                     "peer" -> {
                         peerOnline = obj.optString("state") == "online"
+                        peerBoundary.peer(peerOnline)
                         onState(if (peerOnline) State.PEER_ONLINE else State.WAITING, null)
                     }
                     "pong" -> Unit
@@ -138,6 +153,7 @@ class RelayConnection(
                             .ifBlank { obj.optString("message", context.getString(R.string.relay_err_failed)) }
                         if (reason == "peer offline") {
                             peerOnline = false
+                            peerBoundary.peer(false)
                             onState(State.WAITING, null)
                         } else {
                             onState(State.ERROR, reason)
@@ -150,7 +166,8 @@ class RelayConnection(
             return
         }
 
-        onMessage?.invoke(text)
+        val provenance = peerBoundary.capture() ?: return
+        onMessage?.invoke(text, provenance)
     }
 
     private fun normalizedUrl(): String {

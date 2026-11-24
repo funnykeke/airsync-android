@@ -64,7 +64,7 @@ class ConnectionLifecycleTest {
     }
     @Test fun relayAcceptsStatusButRejectsPrivilegedAndUnknownMessages() {
         for (type in listOf("device", "macInfo", "appList", "appIcons", "notification", "notificationAction", "dismissNotification", "clipboardUpdate", "status")) assertTrue(type, TransportCapabilities.allows("relay", type))
-        for (type in listOf("remoteControl", "browseLs", "startQuickShare", "clipboardImage", "fileChunk", "unknown")) assertFalse(type, TransportCapabilities.allows("relay", type))
+        for (type in listOf("remoteControl", "startQuickShare", "clipboardImage", "unknown")) assertFalse(type, TransportCapabilities.allows("relay", type))
         assertTrue(TransportCapabilities.allows("local", "remoteControl"))
     }
 @Test fun playbackProtocolIsRejectedOnEveryTransportWhileSystemVolumeRemains() {

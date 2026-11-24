@@ -30,7 +30,9 @@ object TransportCapabilities {
         "device", "macInfo", "appList", "appIcons", "notification", "notificationUpdate", "notificationAction", "dismissNotification",
         "dismissalResponse", "notificationActionResponse", "clipboardUpdate", "status",
         "volumeControl", "volumeControlResponse", "macVolume", "ping", "pong", "userDisconnected",
-        "disconnectRequest", "toggleAppNotif", "toggleAppNotifResponse"
+        "disconnectRequest", "toggleAppNotif", "toggleAppNotifResponse",
+        "browseLs", "browseData", "filePull", "fileTransferInit", "fileChunk", "fileChunkAck",
+        "fileTransferComplete", "fileTransferCancel", "transferVerified"
     )
     private val removedPlaybackMessages = setOf("mediaControl", "mediaControlResponse", "macMediaControl", "macMediaControlResponse", "toggleNowPlaying", "toggleNowPlayingResponse")
     fun allows(mode: String, type: String) = type !in removedPlaybackMessages && (mode in setOf("local", "usb") || type in relayMessages)
