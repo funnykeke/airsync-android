@@ -23,8 +23,8 @@ object NotificationDismissalUtil {
     // Reverse map from system notification key to our generated ID
     private val keyToId = ConcurrentHashMap<String, String>()
 
-    // IDs suppressed from Android->Mac dismissal sync (because dismissal originated from Mac)
-    private val suppressedIds = ConcurrentHashMap.newKeySet<String>()
+    // The listener receives the system key even after we clear the forwarded ID.
+    private val suppressedKeys = ConcurrentHashMap.newKeySet<String>()
 
     // Test notification IDs for mock dismissal support
     private val testNotificationIds = ConcurrentHashMap.newKeySet<String>()
@@ -84,12 +84,15 @@ object NotificationDismissalUtil {
                 val service = getNotificationListenerService()
                 if (service != null) {
                     // Mark suppressed to avoid echo back to Mac when onNotificationRemoved triggers
-                    markSuppressed(notificationId)
-                    service.cancelNotification(notification.key)
+                    suppressedKeys.add(notification.key)
+                    try {
+                        service.cancelNotification(notification.key)
+                    } catch (e: Exception) {
+                        suppressedKeys.remove(notification.key)
+                        throw e
+                    }
                     // Cleanup maps after cancel is requested (onNotificationRemoved may also do this)
-                    activeNotifications.remove(notificationId)
-                    keyToId.remove(notification.key)
-                    idMapPrefs()?.edit()?.remove(notification.key)?.apply()
+                    removeBySystemKey(notification.key)
                     Log.d(TAG, "Successfully dismissed notification: $notificationId")
                     true
                 } else {
@@ -213,6 +216,7 @@ object NotificationDismissalUtil {
      * Called after re-registering on listener connect.
      */
     fun prunePersistedMappings(activeKeys: Set<String>) {
+        suppressedKeys.retainAll(activeKeys)
         try {
             val prefs = idMapPrefs() ?: return
             val editor = prefs.edit()
@@ -226,22 +230,11 @@ object NotificationDismissalUtil {
         getNotificationListenerService()?.applicationContext
             ?.getSharedPreferences(ID_MAP_PREFS, android.content.Context.MODE_PRIVATE)
 
-    /**
-     * Lookup generated ID by StatusBarNotification
-     */
-    fun getIdForSbn(sbn: StatusBarNotification?): String? {
-        if (sbn == null) return null
-        return getIdBySystemKey(sbn.key)
-    }
+    fun consumeSuppressed(systemKey: String): Boolean = suppressedKeys.remove(systemKey)
 
-    /** Mark an ID as suppressed for outgoing dismissal sync. */
-    fun markSuppressed(notificationId: String) {
-        suppressedIds.add(notificationId)
-    }
-
-    /** Returns true if the ID was suppressed and clears the suppression flag. */
-    fun consumeSuppressed(notificationId: String): Boolean {
-        return suppressedIds.remove(notificationId)
+    fun removeBySystemKey(systemKey: String) {
+        keyToId.remove(systemKey)?.let { activeNotifications.remove(it) }
+        idMapPrefs()?.edit()?.remove(systemKey)?.apply()
     }
 
     /** Remove from caches when it's gone. */

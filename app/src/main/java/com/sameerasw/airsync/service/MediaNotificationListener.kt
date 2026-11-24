@@ -21,6 +21,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.LinkedList
 
 /** Historical component name preserves existing notification access grants after upgrading. */
@@ -89,7 +91,9 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private var serviceJob = kotlinx.coroutines.SupervisorJob()
-    private var serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private val notificationDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private var serviceScope = CoroutineScope(notificationDispatcher + serviceJob)
+    private val notificationWork = Mutex()
     private lateinit var dataStoreManager: DataStoreManager
 
     // Cache the most recent notification to suppress duplicate delivery.
@@ -106,7 +110,7 @@ class MediaNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
         if (!serviceJob.isActive) {
             serviceJob = kotlinx.coroutines.SupervisorJob()
-            serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+            serviceScope = CoroutineScope(notificationDispatcher + serviceJob)
         }
         serviceInstance = this
         listenerConnected = true
@@ -125,32 +129,31 @@ class MediaNotificationListener : NotificationListenerService() {
         // ID the client already holds even when the notification was updated
         // since (its postTime — embedded in generated IDs — changes on update,
         // while sbn.key stays stable).
-        try {
-            val currentKeys = mutableSetOf<String>()
-            activeNotifications?.forEach { sbn ->
-                if (shouldSkipNotification(sbn)) {
-                    NotificationDismissalUtil.getIdBySystemKey(sbn.key)?.let {
-                        NotificationDismissalUtil.removeFromCaches(it)
+        enqueueNotificationWork {
+            try {
+                val syncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
+                val apps = if (syncEnabled) dataStoreManager.getNotificationApps().first() else emptyList()
+                val currentKeys = mutableSetOf<String>()
+                activeNotifications.orEmpty().forEach { sbn ->
+                    val enabled = apps.find { it.packageName == sbn.packageName }?.isEnabled
+                    if (shouldSkipNotification(sbn) || !NotificationForwardingPolicy.isSelected(syncEnabled, enabled)) {
+                        NotificationDismissalUtil.getIdBySystemKey(sbn.key)?.let {
+                            NotificationDismissalUtil.removeFromCaches(it)
+                        }
+                        return@forEach
                     }
-                    return@forEach
+                    currentKeys.add(sbn.key)
+                    val notificationId = NotificationDismissalUtil.getIdBySystemKey(sbn.key)
+                        ?: NotificationDismissalUtil.getPersistedIdBySystemKey(sbn.key)
+                        ?: return@forEach
+                    NotificationDismissalUtil.storeNotification(notificationId, sbn)
                 }
-                currentKeys.add(sbn.key)
-                val title = sbn.notification?.extras?.getString(Notification.EXTRA_TITLE) ?: ""
-                val notificationId = NotificationDismissalUtil.getIdBySystemKey(sbn.key)
-                    ?: NotificationDismissalUtil.getPersistedIdBySystemKey(sbn.key)
-                    ?: NotificationDismissalUtil.generateNotificationId(
-                        sbn.packageName,
-                        title,
-                        sbn.postTime
-                    )
-                NotificationDismissalUtil.storeNotification(notificationId, sbn)
+                NotificationDismissalUtil.prunePersistedMappings(currentKeys)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore active notifications on listener connect", e)
             }
-            NotificationDismissalUtil.prunePersistedMappings(currentKeys)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to restore active notifications on listener connect", e)
+            syncActiveNotifications()
         }
-
-        syncActiveNotifications()
     }
 
     override fun onListenerDisconnected() {
@@ -179,29 +182,25 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
-        if (!WebSocketUtil.isConnected()) {
-            return
-        }
-        if (sbn != null) handleNotificationRemoval(sbn)
+        sbn?.let { handleNotificationRemoval(it) }
+    }
+
+    private fun enqueueNotificationWork(work: suspend () -> Unit) {
+        // Keep restore, post and removal ordered, including across preference reads.
+        serviceScope.launch { notificationWork.withLock { work() } }
     }
 
     private fun handleNotificationRemoval(sbn: StatusBarNotification) {
-        Log.d(TAG, "Notification removed: ${sbn.packageName}")
-
-        // Sync dismissal to Mac
-        serviceScope.launch {
+        enqueueNotificationWork {
             try {
-                val id = NotificationDismissalUtil.getIdForSbn(sbn) ?: sbn.key
+                val forwardedId = NotificationDismissalUtil.getIdBySystemKey(sbn.key)
+                    ?: NotificationDismissalUtil.getPersistedIdBySystemKey(sbn.key)
+                val suppressed = NotificationDismissalUtil.consumeSuppressed(sbn.key)
+                val eligible = forwardedId != null && !suppressed && WebSocketUtil.isConnected() &&
+                    !shouldSkipNotification(sbn) && isAppSelected(sbn.packageName)
+                val id = NotificationForwardingPolicy.dismissalId(forwardedId, eligible, suppressed)
+                    ?: return@enqueueNotificationWork
 
-                // If this dismissal was initiated by our own dismiss request, skip echo
-                val wasSuppressed = NotificationDismissalUtil.consumeSuppressed(id)
-                if (wasSuppressed) {
-                    Log.d(TAG, "Dismissal for $id was suppressed (originated from Mac)")
-                    NotificationDismissalUtil.removeFromCaches(id)
-                    return@launch
-                }
-
-                // Build and send update via WebSocket
                 val updateJson = JsonUtil.toSingleLine(
                     JsonUtil.createNotificationUpdateJson(
                         id,
@@ -210,56 +209,22 @@ class MediaNotificationListener : NotificationListenerService() {
                     )
                 )
                 WebSocketUtil.sendMessage(updateJson)
-
-                Log.d(TAG, "Sent notification removal sync for $id")
-
-                // Remove from caches since it's gone now
-                NotificationDismissalUtil.removeFromCaches(id)
             } catch (e: Exception) {
                 Log.e(TAG, "Error syncing notification removal: ${e.message}")
+            } finally {
+                NotificationDismissalUtil.removeBySystemKey(sbn.key)
             }
         }
     }
 
     private fun processNotificationForSync(sbn: StatusBarNotification) {
-        serviceScope.launch {
+        enqueueNotificationWork {
             try {
-                // Check before any preference read or cached action registration.
-                if (shouldSkipNotification(sbn)) {
+                if (shouldSkipNotification(sbn) || !isAppSelected(sbn.packageName)) {
                     NotificationDismissalUtil.getIdBySystemKey(sbn.key)?.let {
                         NotificationDismissalUtil.removeFromCaches(it)
                     }
-                    return@launch
-                }
-                // Skip notifications from AirSync itself to prevent feedback loops
-                if (sbn.packageName == packageName) {
-                    return@launch
-                }
-
-                // Skip Phone app notifications - call handling is done via BroadcastReceiver
-                if (sbn.packageName == "com.google.android.dialer") {
-                    Log.d(
-                        TAG,
-                        "Skipping Phone app notification - call handling via BroadcastReceiver"
-                    )
-                    return@launch
-                }
-
-                // Check if notification sync is enabled
-                val isSyncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
-                if (!isSyncEnabled) {
-                    Log.d(TAG, "Notification sync is disabled, skipping notification")
-                    return@launch
-                }
-
-                // Check if this specific app is enabled for notifications
-                val notificationApps = dataStoreManager.getNotificationApps().first()
-                val appSettings = notificationApps.find { it.packageName == sbn.packageName }
-
-                // A missing preference is not consent to synchronize an app.
-                if (appSettings?.isEnabled != true) {
-                    Log.d(TAG, "App ${sbn.packageName} is not enabled for notifications, skipping")
-                    return@launch
+                    return@enqueueNotificationWork
                 }
 
                 val notification = sbn.notification
@@ -285,7 +250,7 @@ class MediaNotificationListener : NotificationListenerService() {
                     // Check for duplicate notifications
                     if (isDuplicateNotification(sbn.packageName, body)) {
                         Log.d(TAG, "Duplicate notification detected, skipping sync: ${sbn.packageName}")
-                        return@launch
+                        return@enqueueNotificationWork
                     }
 
                     // Retrieve existing notification ID (in-memory, then persisted
@@ -297,9 +262,6 @@ class MediaNotificationListener : NotificationListenerService() {
                             title,
                             sbn.postTime
                         )
-
-                    // Store notification for potential dismissal or actions
-                    NotificationDismissalUtil.storeNotification(notificationId, sbn)
 
                     // Extract actions: button or reply
                     val actions = mutableListOf<Pair<String, String>>()
@@ -368,6 +330,7 @@ class MediaNotificationListener : NotificationListenerService() {
                     Log.d(TAG, "Sending notification via WebSocket")
                     val success = WebSocketUtil.sendMessage(notificationJson)
                     if (success) {
+                        NotificationDismissalUtil.storeNotification(notificationId, sbn)
                         Log.d(
                             TAG,
                             "Notification sent successfully"
@@ -424,10 +387,19 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private fun shouldSkipNotification(sbn: StatusBarNotification): Boolean {
-        return SYSTEM_PACKAGES.contains(sbn.packageName) || NotificationForwardingPolicy.isPlayback(
+        return sbn.packageName == packageName || sbn.packageName == "com.google.android.dialer" ||
+            SYSTEM_PACKAGES.contains(sbn.packageName) || NotificationForwardingPolicy.isPlayback(
             sbn.notification.category,
             sbn.notification.extras?.containsKey(Notification.EXTRA_MEDIA_SESSION) == true
         )
+    }
+
+    private suspend fun isAppSelected(packageName: String): Boolean {
+        val syncEnabled = dataStoreManager.getNotificationSyncEnabled().first()
+        if (!syncEnabled) return false
+        val enabled = dataStoreManager.getNotificationApps().first()
+            .find { it.packageName == packageName }?.isEnabled
+        return NotificationForwardingPolicy.isSelected(syncEnabled, enabled)
     }
 
     private fun getAppNameFromPackage(packageName: String): String {
