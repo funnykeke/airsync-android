@@ -64,8 +64,8 @@
     <string name="help_getting_started_body">For local LAN mode, keep your Android and Mac on the same Wi-Fi network, then scan the QR code shown in AirSync on Mac or enter IP/port/key manually.</string>
     <string name="help_permissions_body">• Notification Access: Required for notification sync (enable Restricted Settings in App Info for sideloaded APKs).\n• Post Notifications: Shows ongoing connection status.\n• Ignore Battery Optimization: Keeps background sync alive.\n• Storage (Optional): For wallpaper sync and local file access.</string>
     <string name="help_reconnection_body">When disconnected unexpectedly, AirSync automatically retries in the background. You can also tap the Quick Settings tile to reconnect or pause anytime.</string>
-    <string name="help_relay_body">Relay mode lets you sync notifications, text clipboard, battery status, and system volume across different networks via your own WSS relay server. Enter identical server URL, room, room secret (≥16 chars), and copy the AES key from Mac. Leave cert fingerprint blank for CA-signed HTTPS domains, or enter the 64-char SHA-256 hex fingerprint for self-signed certs.</string>
-    <string name="help_troubleshooting_body">• Notification stopped syncing: Re-open the app or check Notification Access permission.\n• Relay auth failed: Confirm the AES key from Mac matches and room secret is ≥16 chars.\n• LAN IP not found: Check Wi-Fi AP isolation or VPN routing.</string>
+    <string name="help_relay_body">Use your WSS relay to sync notifications, text clipboard, battery status, and system volume across networks. Enter the same server URL, room, and room secret (at least 16 characters) on both devices. Copy the separate AES encryption key from Connection Mode on the Mac and paste it into Encryption key on the phone. Leave the fingerprint blank for a CA-signed certificate, or enter the 64-character SHA-256 hex fingerprint for a self-signed certificate.</string>
+    <string name="help_troubleshooting_body">• If notifications stop syncing, reopen the app or check Notification Access permission.\n• If relay authentication fails, check that the room secret matches on both devices and has at least 16 characters. Copy the AES encryption key from the Mac again if needed.\n• If you cannot find the LAN IP, check Wi-Fi AP isolation or VPN routing.</string>
     <string name="label_clipboard_tile">Clipboard Tile</string>
     <string name="label_clipsync_credits">Background clipboard sync adapted from ClipSync by Bhanu (MIT)</string>
     <string name="label_connect_to_desktop">Connect to Desktop:</string>
@@ -274,7 +274,7 @@
     <string name="ui_relay_cert_pin_note">Leave empty for standard CA-signed HTTPS servers; enter 64-char hex fingerprint for self-signed relay certs.</string>
     <string name="ui_relay_cert_pin_placeholder">64-char hex for self-signed cert</string>
     <string name="ui_relay_connected">Connected via relay</string>
-    <string name="ui_relay_limitation">Mirroring, file transfer and remote control are not available in relay mode.</string>
+    <string name="ui_relay_limitation">Quick Share and WebDAV require local network mode. Mirroring requires a separate, authorized ADB connection.</string>
     <string name="ui_relay_room">Room</string>
     <string name="ui_relay_secret">Secret</string>
     <string name="ui_relay_secret_hint">At least 16 characters</string>
@@ -304,7 +304,7 @@
     <string name="ui_transport_local">Local network</string>
     <string name="ui_transport_local_desc">Phone and Mac must be on the same Wi-Fi. All features supported.</string>
     <string name="ui_transport_relay">Server relay</string>
-    <string name="ui_transport_relay_desc">Relay through your own server. Works on different networks. Mirroring and file transfer unavailable.</string>
+    <string name="ui_transport_relay_desc">Sync across networks through your own server. Confirm each encrypted file transfer batch on the Mac.</string>
     <string name="ui_troubleshooting">Troubleshooting</string>
     <string name="ui_trying_to_reconnect">Trying to reconnect</string>
     <string name="ui_type_a_message_or_drag_text_here">Type a message or drag text here...</string>

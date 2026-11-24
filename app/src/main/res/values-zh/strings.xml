@@ -64,8 +64,8 @@
     <string name="help_getting_started_body">局域网直连模式下，请确保手机与 Mac 在同一 Wi-Fi 网络中，然后扫描 Mac 端 AirSync 显示的二维码，或手动输入 IP、端口与加密密钥连接。</string>
     <string name="help_permissions_body">• 通知使用权：同步通知所必需（侧载安装若受限，请在应用信息右上角允许受限设置）。\n• 发送通知：显示常驻连接状态与传输提醒。\n• 关闭电池优化：防止后台同步被系统杀掉。\n• 存储权限（可选）：仅用于局域网壁纸同步与文件访问。</string>
     <string name="help_reconnection_body">意外断开时 AirSync 会自动尝试重连；你也可以通过下拉快捷设置磁贴一键重连、发送剪贴板或暂停同步。</string>
-    <string name="help_relay_body">服务器中转模式可通过你自建的 WSS 中转服务跨网同步通知、文本剪贴板、电量与系统音量。请确保两端填写相同的服务器地址、房间名和至少 16 位房间密钥，并从 Mac 复制 AES 加密密钥。若中转使用正规 CA 证书，证书指纹留空即可；若使用自签证书，填入 64 位 SHA-256 十六进制指纹。</string>
-    <string name="help_troubleshooting_body">• 通知停止同步：请检查通知使用权是否开启并重新打开应用触发重绑。\n• 中转认证失败：请确认 Mac 端 AES 加密密钥与房间密钥（≥16 位）完全一致。\n• 局域网搜不到设备：请检查路由器 AP 隔离或手机/Mac 是否开启了阻断局域网的 VPN。</string>
+    <string name="help_relay_body">通过自建的 WSS 中转服务跨网同步通知、文本剪贴板、电量与系统音量。两端填写相同的服务器地址、房间名和房间密钥（至少 16 个字符）。另从 Mac 的「连接方式」复制 AES 加密密钥，粘贴到手机的「加密密钥」。使用正规 CA 证书时留空指纹，使用自签证书时填入 64 位 SHA-256 十六进制指纹。</string>
+    <string name="help_troubleshooting_body">• 通知停止同步时，请检查通知使用权是否开启，再重新打开应用。\n• 中转认证失败时，请确认两端的房间密钥一致且至少有 16 个字符，必要时重新从 Mac 复制 AES 加密密钥。\n• 局域网搜不到设备时，请检查路由器 AP 隔离或手机及 Mac 的 VPN 设置。</string>
     <string name="label_clipboard_tile">剪贴板磁贴</string>
     <string name="label_clipsync_credits">后台剪贴板同步改编自 Bhanu 的 ClipSync（MIT 许可）</string>
     <string name="label_connect_to_desktop">连接到桌面端：</string>
@@ -274,7 +274,7 @@
     <string name="ui_relay_cert_pin_note">使用正规 CA 证书时留空即可；自签证书请填写 64 位十六进制 SHA-256 指纹。</string>
     <string name="ui_relay_cert_pin_placeholder">自签证书填 64 位十六进制指纹，正规证书留空</string>
     <string name="ui_relay_connected">已通过中转连接</string>
-    <string name="ui_relay_limitation">中转模式下不支持投屏、文件传输和远程控制。</string>
+    <string name="ui_relay_limitation">附近快传（Quick Share）和 WebDAV 需使用局域网直连。投屏需独立的已授权 ADB 连接。</string>
     <string name="ui_relay_room">房间名</string>
     <string name="ui_relay_secret">密钥</string>
     <string name="ui_relay_secret_hint">至少 16 位</string>
@@ -304,7 +304,7 @@
     <string name="ui_transport_local">局域网直连</string>
     <string name="ui_transport_local_desc">手机与 Mac 需在同一 Wi-Fi。支持全部功能。</string>
     <string name="ui_transport_relay">服务器中转</string>
-    <string name="ui_transport_relay_desc">通过你自己的服务器中转，不在同一网络也能用。投屏和文件传输不可用。</string>
+    <string name="ui_transport_relay_desc">通过自建服务器跨网同步。加密文件传输需在 Mac 上逐批确认。</string>
     <string name="ui_troubleshooting">故障排查</string>
     <string name="ui_trying_to_reconnect">正在尝试重连</string>
     <string name="ui_type_a_message_or_drag_text_here">输入消息，或把文本拖到这里…</string>
