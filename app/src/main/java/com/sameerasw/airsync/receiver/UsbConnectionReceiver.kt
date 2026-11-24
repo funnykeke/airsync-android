@@ -29,6 +29,7 @@ class UsbConnectionReceiver : BroadcastReceiver() {
                 Log.i("AirSyncConnection", "event=usb_receiver_exception class=${exception.javaClass.simpleName}")
                 pending.resultCode = Activity.RESULT_CANCELED
             } finally {
+                pending.resultData = HANDLED
                 pending.finish()
             }
         }
@@ -37,6 +38,7 @@ class UsbConnectionReceiver : BroadcastReceiver() {
     companion object {
         const val CONNECT = "com.sameerasw.airsync.USB_CONNECT"
         const val DISCONNECT = "com.sameerasw.airsync.USB_DISCONNECT"
+        private const val HANDLED = "airsync_usb_handled_v1"
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     }
 }

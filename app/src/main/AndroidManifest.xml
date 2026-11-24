@@ -233,6 +233,15 @@
             android:name=".receiver.UsbConnectionReceiver"
             android:exported="true"
             android:permission="android.permission.DUMP" />
+
+        <activity
+            android:name=".receiver.UsbWakeActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:permission="android.permission.DUMP"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
     </application>
 
     <queries>
