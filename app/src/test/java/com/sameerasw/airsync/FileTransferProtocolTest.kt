@@ -6,6 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import java.util.concurrent.CopyOnWriteArrayList
 
 class FileTransferProtocolTest {
@@ -27,6 +28,42 @@ class FileTransferProtocolTest {
         override fun close() { sender.close(); receiver.close(); root.deleteRecursively() }
     }
     private suspend fun until(predicate: () -> Boolean) { withTimeout(4000) { while (!predicate()) delay(5) } }
+
+    @Test fun onlyVerifiedExplicitPngReachesClipboardAndIsStillSaved() = runBlocking {
+        val root = Files.createTempDirectory("clipboard-receive").toFile()
+        val frames = CopyOnWriteArrayList<FileTransferFrame>()
+        val clipboard = CopyOnWriteArrayList<File>()
+        val png = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNt0AAAAASUVORK5CYII="
+        )
+        val checksum = MessageDigest.getInstance("SHA-256").digest(png).joinToString("") { "%02x".format(it) }
+        val engine = FileTransferProtocol(root, root, { true }, { frames.add(it); true },
+            onClipboardImage = { clipboard.add(it); Unit })
+
+        suspend fun upload(id: String, bytes: ByteArray = png, image: Boolean = true) {
+            engine.handle(FileTransferFrame("fileTransferInit", id, "$id.png", bytes.size.toLong(),
+                checksum = checksum, mime = "image/png", clipboardImage = image))
+            engine.handle(FileTransferFrame("fileChunk", id, index = 0, bytes = bytes))
+            until { frames.any { it.id == id && it.type == "fileChunkAck" } }
+            engine.handle(FileTransferFrame("fileTransferComplete", id))
+            until { frames.any { it.id == id && it.type in setOf("transferVerified", "fileTransferCancel") } }
+        }
+
+        try {
+            upload("explicit")
+            assertArrayEquals(png, clipboard.single().readBytes())
+            engine.handle(FileTransferFrame("fileTransferComplete", "explicit"))
+            until { frames.count { it.id == "explicit" && it.type == "transferVerified" } == 2 }
+            upload("normal", image = false)
+            upload("tampered", bytes = png.copyOf().also { it[it.lastIndex] = 0 })
+            assertEquals(listOf("explicit.png"), clipboard.map { it.name })
+            assertEquals(listOf("explicit.png", "normal.png"), File(root, "Download").list()!!.sorted())
+            assertTrue(frames.any { it.id == "tampered" && it.type == "fileTransferCancel" })
+        } finally {
+            engine.close()
+            root.deleteRecursively()
+        }
+    }
 
     @Test fun actualProtocolUsesRequestedIdAndWaitsForVerifiedSave() = runBlocking {
         Pairing().use { p ->

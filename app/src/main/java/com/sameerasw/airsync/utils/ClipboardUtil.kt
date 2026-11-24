@@ -4,6 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import androidx.core.content.FileProvider
+import java.io.File
+
+class ClipboardImageProvider : FileProvider()
 
 object ClipboardUtil {
     private const val TAG = "ClipboardUtil"
@@ -19,8 +23,11 @@ object ClipboardUtil {
 
             if (clipData != null && clipData.itemCount > 0) {
                 val item = clipData.getItemAt(0)
-                // Use coerceToText to handle non-text items if needed, or stick to text
-                item.text?.toString() ?: item.coerceToText(context)?.toString()
+                item.text?.toString() ?: if (clipData.description.hasMimeType("image/*")) {
+                    null
+                } else {
+                    item.coerceToText(context)?.toString()
+                }
             } else {
                 null
             }
@@ -93,21 +100,30 @@ object ClipboardUtil {
         }
     }
 
-    /**
-     * Set a content URI to clipboard (useful for images)
-     */
-    fun copyUriToClipboard(context: Context, uri: android.net.Uri): Boolean {
-        return try {
-            val clipboardManager =
-                context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clipData =
-                ClipData.newUri(context.contentResolver, "AirSync Image", uri)
-            clipboardManager.setPrimaryClip(clipData)
-            Log.d(TAG, "URI set to clipboard: $uri")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error setting clipboard URI: ${e.message}")
-            false
+    @Synchronized
+    fun copyImageToClipboard(context: Context, source: File, ownsSession: () -> Boolean): Boolean {
+        val directory = File(context.cacheDir, "clipboard-images")
+        var cached: File? = null
+        var published = false
+        try {
+            if (!ownsSession()) return false
+            directory.mkdirs()
+            val image = File.createTempFile("image-", ".png", directory)
+            cached = image
+            source.copyTo(image, overwrite = true)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.clipboard-images", image)
+            val clip = ClipData.newUri(context.contentResolver, "AirSync Image", uri)
+            val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return false
+            if (!ownsSession()) return false
+            clipboard.setPrimaryClip(clip)
+            published = true
+            directory.listFiles()?.filter { it != image }?.sortedByDescending { it.lastModified() }
+                ?.drop(3)?.forEach { it.delete() }
+        } catch (_: Exception) {
+            Log.w(TAG, "Could not publish image clipboard")
+        } finally {
+            if (!published) cached?.delete()
         }
+        return published
     }
 }

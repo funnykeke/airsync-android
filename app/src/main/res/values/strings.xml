@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clipboard_image_received">Image copied. Paste it in a compatible app or select it from your photos.</string>
+    <string name="clipboard_image_saved">Image saved to Downloads. You can select it from your photos.</string>
     <string name="about_description">Battery-optimized AirSync Android client for syncing notifications, clipboard, system volume, and battery status with Mac over LAN or self-hosted relay.</string>
     <string name="about_maintainer">Maintained by %1$s</string>
     <string name="about_upstream_attribution">Modified from the open-source sameerasw/airsync-android project under MPL-2.0 (with Additional Terms). Unofficial community/personal fork.</string>

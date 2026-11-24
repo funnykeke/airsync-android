@@ -1,11 +1,14 @@
 package com.sameerasw.airsync.utils
 
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.os.Environment
 import android.util.Base64
 import android.widget.Toast
+import com.sameerasw.airsync.R
 import kotlinx.coroutines.*
 import org.json.JSONObject
+import java.io.File
 
 /** Android/JSON adapter for the encrypted file protocol on every authenticated transport. */
 object LocalFileTransfer {
@@ -30,7 +33,8 @@ object LocalFileTransfer {
                 { WebSocketUtil.ownsFileSession(captured) }, { send(captured, it) },
                 onSaved = { browseScope.launch(Dispatchers.Main) {
                     if (WebSocketUtil.ownsFileSession(captured)) Toast.makeText(app, "文件已保存", Toast.LENGTH_LONG).show()
-                } })
+                } },
+                onClipboardImage = { publishClipboardImage(app, captured, it) })
         }
         return protocol
     }
@@ -46,10 +50,24 @@ object LocalFileTransfer {
                 engine.handle(FileTransferFrame(type, id, data.optString("name"), data.optLong("size"),
                     data.optInt("chunkSize", 65536), data.optString("checksum"), data.optString("targetPath").ifBlank { null },
                     data.optInt("index", -1), if (type == "fileChunk") Base64.decode(data.getString("chunk"), Base64.DEFAULT) else byteArrayOf(),
-                    data.optBoolean("verified")))
+                    data.optBoolean("verified"), mime = data.optString("mime"),
+                    clipboardImage = data.optBoolean("clipboardImage")))
             }
         } catch (_: Exception) {
             if (FileTransferProtocol.validId(id)) send(captured, FileTransferFrame("fileTransferCancel", id))
+        }
+    }
+
+    private fun publishClipboardImage(context: Context, captured: WebSocketUtil.FileSession, file: File) {
+        val ownsSession = { WebSocketUtil.ownsFileSession(captured) }
+        if (!ownsSession()) return
+        val written = ClipboardUtil.copyImageToClipboard(context, file, ownsSession)
+        // Retain the delivered file for apps whose message field does not accept image clips.
+        runCatching { MediaScannerConnection.scanFile(context, arrayOf(file.path), arrayOf("image/png"), null) }
+        browseScope.launch(Dispatchers.Main) {
+            if (!ownsSession()) return@launch
+            val message = if (written) R.string.clipboard_image_received else R.string.clipboard_image_saved
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
     internal fun browse(data: JSONObject, captured: WebSocketUtil.FileSession) {

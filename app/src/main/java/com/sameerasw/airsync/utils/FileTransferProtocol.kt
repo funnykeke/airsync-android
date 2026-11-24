@@ -5,6 +5,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.io.DataInputStream
 import java.io.RandomAccessFile
 import java.security.MessageDigest
 import java.util.BitSet
@@ -15,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap
 data class FileTransferFrame(
     val type: String, val id: String, val name: String = "", val size: Long = 0,
     val chunkSize: Int = 65536, val checksum: String = "", val targetPath: String? = null,
-    val index: Int = -1, val bytes: ByteArray = byteArrayOf(), val verified: Boolean = false
+    val index: Int = -1, val bytes: ByteArray = byteArrayOf(), val verified: Boolean = false,
+    val mime: String = "", val clipboardImage: Boolean = false
 )
 
 class FileTransferPolicy(
@@ -36,14 +38,15 @@ class FileTransferProtocol(
     private val policy: FileTransferPolicy = FileTransferPolicy(),
     private val onSaved: (File) -> Unit = {},
     private val resolveSource: suspend (String) -> File = { SharedStoragePath.resolve(storageRoot, it) },
-    private val beforeStage: suspend () -> Unit = {}
+    private val beforeStage: suspend () -> Unit = {},
+    private val onClipboardImage: (File) -> Unit = {}
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
     @Volatile private var closed = false
     private data class Outgoing(val ack: Channel<Int>, val verified: CompletableDeferred<Boolean>, val job: Job,
         @Volatile var awaitingVerification: Boolean = false)
     private data class Incoming(val file: File, val handle: RandomAccessFile, val name: String,
-        val directory: File, val layout: FileChunkLayout, val checksum: String,
+        val directory: File, val layout: FileChunkLayout, val checksum: String, val clipboardImage: Boolean,
         val received: BitSet = BitSet(), var expiry: Long = 0, var fullyReceived: Boolean = false, var timer: Job? = null)
     private data class Receipt(val expires: Long)
     private val outgoing = ConcurrentHashMap<String, Outgoing>()
@@ -111,11 +114,16 @@ class FileTransferProtocol(
         require(!incoming.containsKey(frame.id) && !receipts.containsKey(frame.id) && incoming.size < 3)
         require(frame.name.isNotBlank() && frame.name !in setOf(".", "..") && frame.name.none { it == '/' || it == '\\' || it == '\u0000' })
         require(frame.checksum.matches(Regex("[A-Fa-f0-9]{64}")))
+        if (frame.clipboardImage) {
+            require(frame.mime == "image/png" && frame.name.endsWith(".png", ignoreCase = true))
+            require(frame.size in pngSignature.size.toLong()..32L * 1024 * 1024)
+        }
         val layout = FileChunkLayout(frame.size, frame.chunkSize)
         val directory = FileTransferDestination.resolve(storageRoot, frame.targetPath)
         require(cacheDir.usableSpace > layout.size)
         val file = File.createTempFile("airsync-incoming-", ".part", cacheDir)
-        val transfer = Incoming(file, RandomAccessFile(file, "rw"), frame.name, directory, layout, frame.checksum)
+        val transfer = Incoming(file, RandomAccessFile(file, "rw"), frame.name, directory, layout,
+            frame.checksum, frame.clipboardImage)
         incoming[frame.id] = transfer
         renew(frame.id, transfer)
     }
@@ -153,6 +161,11 @@ class FileTransferProtocol(
         transfer.handle.close()
         try {
             require(sha256(transfer.file).equals(transfer.checksum, true))
+            if (transfer.clipboardImage) {
+                val header = ByteArray(pngSignature.size)
+                DataInputStream(transfer.file.inputStream()).use { it.readFully(header) }
+                require(header.contentEquals(pngSignature))
+            }
             beforeStage()
             checkSession()
             // Re-resolve after hashing/delay so a changed symlink cannot escape the root.
@@ -172,10 +185,11 @@ class FileTransferProtocol(
                     while (true) { checkSession(); val count = input.read(buffer); if (count < 0) break; output.write(buffer, 0, count) }
                 } }
                 checkSession()
+                if (transfer.clipboardImage) onClipboardImage(target)
                 if (receipts.size >= 32) receipts.minByOrNull { it.value.expires }?.key?.let { receipts.remove(it) }
                 receipts[frame.id] = Receipt(now() + policy.verificationMs(transfer.layout.size) + policy.grace())
                 send(FileTransferFrame("transferVerified", frame.id, verified = true))
-                onSaved(target)
+                if (!transfer.clipboardImage) onSaved(target)
             } catch (error: Exception) { target.delete(); throw error }
         } finally { discard(frame.id) }
     }
@@ -242,5 +256,8 @@ class FileTransferProtocol(
         outgoing.values.forEach { it.job.cancel() }
         scope.launch { receiverLock.withLock { incoming.keys.toList().forEach(::discard); receipts.clear() } }
     }
-    companion object { fun validId(id: String) = id.matches(Regex("[A-Za-z0-9-]{1,80}")) }
+    companion object {
+        private val pngSignature = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+        fun validId(id: String) = id.matches(Regex("[A-Za-z0-9-]{1,80}"))
+    }
 }

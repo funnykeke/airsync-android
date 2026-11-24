@@ -6,7 +6,6 @@
 package com.sameerasw.airsync.presentation.ui.activities
 
 import android.app.Activity
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -17,6 +16,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import com.sameerasw.airsync.utils.ClipboardSyncManager
+import com.sameerasw.airsync.utils.ClipboardUtil
 
 /**
  * Invisible activity that holds focus just long enough to read the clipboard, since Android 10+
@@ -58,12 +58,7 @@ class ClipboardGhostActivity : Activity() {
 
     private fun readAndFinish() {
         try {
-            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val text = clipboard.primaryClip
-                ?.takeIf { it.itemCount > 0 }
-                ?.getItemAt(0)
-                ?.coerceToText(this)
-                ?.toString()
+            val text = ClipboardUtil.getClipboardText(this)
             if (!text.isNullOrBlank()) {
                 ClipboardSyncManager.onBackgroundClipboardCaptured(applicationContext, text)
             }

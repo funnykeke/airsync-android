@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clipboard_image_received">图片已复制，可在支持图片的输入框粘贴，或从相册选择。</string>
+    <string name="clipboard_image_saved">图片已保存到下载，可从相册选择。</string>
     <string name="about_description">省电精简版 AirSync 安卓客户端，支持通过局域网或自建中转服务器与 Mac 同步通知、剪贴板、系统音量与电量。</string>
     <string name="about_maintainer">维护者：%1$s</string>
     <string name="about_upstream_attribution">基于开源项目 sameerasw/airsync-android（MPL-2.0 及附加条款）修改，非官方发行版。</string>

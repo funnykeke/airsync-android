@@ -36,6 +36,15 @@
         android:theme="@style/Theme.AirSync"
         tools:targetApi="36">
 
+        <provider
+            android:name=".utils.ClipboardImageProvider"
+            android:authorities="${applicationId}.clipboard-images"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clipboard_image_paths" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
